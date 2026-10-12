@@ -1,260 +1,514 @@
 <!DOCTYPE html>
-<html lang="en-NG" data-theme="dark">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Promota — Earn data and cash from your phone</title>
-<meta name="description" content="Promota Nigeria pilot. Complete tasks, earn points, redeem for mobile data and cash. No joining fee. No follower requirements.">
-<meta name="robots" content="noindex,nofollow">
-<meta property="og:title" content="Promota — Naija Promotes the World.">
-<meta property="og:description" content="Anyone with a phone can join. Complete tasks, earn points, get mobile data and cash. No follower requirements.">
-<meta property="og:type" content="website">
-<meta property="og:locale" content="en_NG">
-<meta property="og:image" content="assets/identity/og-image.png">
-<meta name="theme-color" content="#04120b" id="themeColor">
-<link rel="icon" type="image/svg+xml" href="assets/identity/favicon.svg">
-<script src="theme-boot.js"></script>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Promota - Football Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --bg-subtle: #111827;
+      --fg: #f0f4f8;
+      --muted: #6b7c93;
+      --accent: #f59e0b;
+      --accent-bright: #fbbf24;
+      --card: #1a2235;
+      --border: #2a3a52;
+      --gold: #d4af37;
+      --silver: #c0c0c0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      overflow-x: hidden;
+      margin: 0;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Playfair Display', serif;
+    }
+
+    .footer-link {
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .footer-link:hover {
+      color: var(--accent);
+    }
+
+    /* Football animation canvas */
+    #football-canvas {
+      display: block;
+    }
+
+    /* Reduced motion for accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      .float-animate {
+        animation: none;
+      }
+      .spin-slow {
+        animation-duration: 20s !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
 </head>
 <body>
-<a class="skip" href="#main">Skip to content</a>
-
-<header class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="#main" aria-label="Promota home">
-      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 26 26" role="img" aria-label="Promota mark"><rect x="1" y="1" width="24" height="24" rx="7" fill="none" stroke="#f4dc9d" stroke-width="2.4"/><path d="M6 17 A7 7 0 0 1 20 17" fill="none" stroke="#d9b263" stroke-width="2.4" stroke-linecap="round"/><path d="M17.5 8.5 L20 6 L22.5 8.5 M20 6 L20 12" fill="none" stroke="#f4dc9d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <span class="brand-name">Promota<small>Nigeria pilot</small></span>
-    </a>
-    <nav class="links" aria-label="Main">
-      <a href="#earn">How it works</a>
-      <a href="#tasks">Tasks & Points</a>
-      <a href="#rewards">Rewards</a>
-      <a href="#faq">FAQ</a>
-      <a href="#join">Join</a>
-    </nav>
-    <div class="nav-cta">
-      <button class="theme-btn" type="button" id="themeBtn" aria-pressed="false" aria-label="Switch to light theme">Light</button>
-      <a class="btn primary" href="#join" data-lane="promoter">Join Promota</a>
-    </div>
-    <button class="menu-btn" type="button" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menu</button>
-  </div>
-  <nav class="mobile-menu" id="mobileMenu" aria-label="Mobile">
-    <button class="theme-btn" type="button" id="themeBtnMobile" aria-pressed="false" aria-label="Switch to light theme">Light theme</button>
-    <a href="#earn">How it works</a>
-    <a href="#tasks">Tasks & Points</a>
-    <a href="#rewards">Rewards</a>
-    <a href="#faq">FAQ</a>
-    <a href="#join" data-lane="promoter">Join Promota</a>
-  </nav>
-</header>
-
-<main id="main">
-
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-copy">
-      <p class="eyebrow">Pilot build · Not yet open to the public</p>
-      <h1>Join the Promota pilot</h1>
-      <p class="lede">We are running a pilot to test lead‑capture and point‑based rewards. Complete the form below to register your interest; we will contact you when your city opens.</p>
-      <div class="hero-btns">
-        <a class="btn primary big" href="#join" data-lane="promoter">Join the promoter list</a>
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] backdrop-blur-sm background-[var(--bg-subtle)]">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="#" class="text-2xl font-semibold tracking-tight">
+        <span class="text-[var(--accent)]">Promota</span> Football
+      </a>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#features" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">Features</a>
+        <a href="#how-it-works" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">How It Works</a>
+        <a href="#pricing" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">Pricing</a>
       </div>
-      <ul class="hero-facts">
-        <li><strong>Checked results only</strong> You are never paid for likes, follows or silent views.</li>
-        <li><strong>Points-based tasks</strong> Every task shows its point value before you start.</li>
-        <li><strong>Data before cash</strong> MTN, Glo and Airtel bundles land on your own line.</li>
-      </ul>
+      <div class="flex items-center gap-3">
+        <button id="login-btn" class="rounded-md text-sm font-medium px-4 py-2 border border-[var(--border)] bg-transparent hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-all">
+          Login
+        </button>
+        <button id="signup-btn" class="rounded-md text-sm font-medium px-4 py-2 bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
+          Signup
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <main class="relative min-h-screen">
+    <!-- Football Canvas Animation -->
+    <canvas id="football-canvas" class="absolute inset-0 w-full h-full" aria-hidden="true"></canvas>
+
+    <!-- Overlay gradient -->
+    <div class="absolute inset-0 bg-gradient-to-b from-[var(--bg)] via-[var(--bg-subtle)] to-transparent"></div>
+
+    <!-- Content Layer -->
+    <div class="relative z-10 min-h-screen max-w-7xl mx-auto px-6 py-16 md:py-24 flex flex-col items-center justify-center gap-8 text-center">
+      
+      <!-- Football Trophy Icon -->
+      <div class="relative mb-12">
+        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5" class="mx-auto">
+          <circle cx="12" cy="12" r="9" stroke-opacity="0.3"/>
+          <path d="M8 14s1.5 2 4 2 4-2 4-2" stroke-opacity="1"/>
+          <line x1="9" y1="9" x2=15" y2="9"/>
+          <line x1="12" y1="17" x2="12" y2="22"/>
+          <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4"/>
+        </svg>
+        <div class="absolute -inset-2 bg-gradient-to-br from-[var(--accent)] to-[var(--accent-bright)] rounded-full opacity-30 blur-sm"></div>
+      </div>
+
+      <!-- Heading -->
+      <h1 class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-none mb-6">
+        <span class="block">Football</span>
+        <span class="block">Intelligence</span>
+      </h1>
+      <p class="text-lg md:text-xl text-[var(--muted)] max-w-2xl mx-auto mb-12">
+        The intelligent content promotion platform for football fans and creators.
+      </p>
+
+      <!-- CTA Buttons -->
+      <div class="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+        <button id="login-cta" class="rounded-md font-medium px-6 py-3 border border-[var(--border)] bg-transparent text-[var(--fg)] hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-all">
+          Login
+        </button>
+        <button id="signup-cta" class="rounded-md font-medium px-6 py-3 bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
+          Get Started
+        </button>
+      </div>
+
+      <!-- Scroll Indicator -->
+      <div class="mt-12 flex flex-col items-center gap-2 text-[var(--muted)]">
+        <span>Scroll</span>
+        <div class="w-6 h-6 border-2 border-[var(--border)] rounded-full animate-bounce" aria-hidden="true"></div>
+      </div>
     </div>
 
-    <div class="stage" id="stage">
-      <p class="stage-caption" id="stageCaption">Work on one side. Reward on the other.</p>
-      <div class="lane lane-coin">
-        <div class="orb" aria-hidden="true">
-          <div class="coin">
-            <div class="coin-face">
-              <span class="coin-glyph">₦</span>
-              <span class="coin-rim"></span>
+    <!-- Features Section (scrolled to) -->
+    <section id="features" class="py-24 md:py-32 bg-[var(--bg-subtle)]">
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+          <div>
+            <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/>
+                <path d="M2 12l10 5 10-5"/>
+              </svg>
             </div>
-            <div class="coin-rim-bottom"></div>
+            <h3 class="text-xl font-bold mb-3">Smart Analytics</h3>
+            <p class="text-[var(--muted)] text-sm">Data-driven insights for football content performance</p>
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                <line x1="9" y1="9" x2="15" y2="9"/>
+                <line x1="12" y1="17" x2="12" y2="22"/>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-3">Content Distribution</h3>
+            <p class="text-[var(--muted)] text-sm">Automated promotion across platforms</p>
+          </div>
+          <div>
+            <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M12 8v4"/>
+                <path d="M9 12l2 2l4-2l2 2"/>
+                <path d="M15 12l2 2l-4-2l2-2"/>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-3">Fan Engagement</h3>
+            <p class="text-[var(--muted)] text-sm">Interactive experiences for true supporters</p>
           </div>
         </div>
-        <h2 class="lane-label">Reward</h2>
       </div>
-      <div class="lane lane-data">
-        <div class="orb" aria-hidden="true">
-          <div class="data-orb">
-            <span class="data-bars"><i></i><i></i><i></i></span>
-            <span class="data-pulse"></span>
+    </section>
+
+    <!-- How It Works -->
+    <section id="how-it-works" class="py-24 md:py-32 relative">
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="grid md:grid-cols-2 gap-12 items-center">
+          <div>
+            <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-6">
+              How It Works
+            </h2>
+            <p class="text-[var(--muted)] text-lg mb-8">
+              Transform football analysis into compelling content in 3 simple steps.
+            </p>
+            <ol class="list-decimal list-inside space-y-4 text-sm">
+              <li>
+                <strong class="font-semibold">Connect</strong>
+                Integrate your football data and content sources
+              </li>
+              <li>
+                <strong class="font-semibold">Analyze</strong>
+                AI-powered insights and performance metrics
+              </li>
+              <li>
+                <strong class="font-semibold">Distribute</strong>
+                Automated promotion to reach more fans
+              </li>
+            </ol>
+          </div>
+          <div class="relative">
+            <div class="rounded-2xl overflow-hidden bg-gradient-to-br from-[var(--card)] to-[var(--bg-subtle)] border border-[var(--border)]">
+              <svg width="400" height="300" viewBox="0 0 400 300" fill="none" class="opacity-30">
+                <path d="M200 0 C200 0 200 300 200 300 C200 300 400 300 400 300 C400 300 400 0 200 0 Z" fill="var(--bg-subtle)"/>
+                <circle cx="100" cy="150" r="50" fill="var(--accent)" opacity="0.4"/>
+                <circle cx="300" cy="150" r="50" fill="var(--accent-bright)" opacity="0.4"/>
+              </svg>
+              <div class="absolute inset-0 p-6 flex flex-col justify-center">
+                <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-4">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                  </svg>
+                </div>
+                <h4 class="font-medium text-[var(--fg)]">Smart</h4>
+                <p class="text-[var(--muted)] mt-2">AI analysis</p>
+              </div>
+              <div class="absolute bottom-4 left-4 right-4 px-6 py-4 bg-[var(--card)] rounded-bl-2xl text-center">
+                <p class="text-[var(--muted)] text-sm">Experience the future of football content</p>
+              </div>
+            </div>
           </div>
         </div>
-        <h2 class="lane-label">Data</h2>
       </div>
-      <p class="stage-note">Illustrative symbols. Not photographs of real users.</p>
-    </div>
-  </div>
-</section>
+    </section>
 
-<section class="section" id="earn">
-  <p class="eyebrow">How it works · 3 steps</p>
-  <h2>Your path to data and cash</h2>
-  <ol class="steps">
-    <li>
-      <h3>Join with your phone</h3>
-      <p>Enter your name and Nigerian phone number. Get your personal invite code instantly. No follower count needed. No social links required.</p>
-    </li>
-    <li>
-      <h3>Complete tasks, earn points</h3>
-      <p>Browse available tasks. Each shows exactly how many points you earn. Post, share, click, or verify — every completed task adds points to your balance.</p>
-    </li>
-    <li>
-      <h3>Redeem points for data or cash</h3>
-      <p>Points convert to MTN, Glo, or Airtel bundles instantly on your own number. Cash unlocks as you grow through levels. Referral points boost your progress — especially after level 3.</p>
-    </li>
-  </ol>
-  <div class="center">
-    <a class="btn primary big" href="#join" data-lane="promoter">Join the promoter list</a>
-  </div>
-</section>
-
-<section class="section dark" id="tasks">
-  <p class="eyebrow">Tasks & Points</p>
-  <h2>Simple tasks, clear points</h2>
-  <div class="cards3">
-    <div class="card">
-      <h3>Social tasks</h3>
-      <p>Share a post, comment, follow a brand account. Points awarded per completed action. No fake engagement — only verifiable actions count.</p>
-    </div>
-    <div class="card">
-      <h3>Verification tasks</h3>
-      <p>Confirm a business location, test a USSD code, screenshot a promo. Higher points for tasks needing physical presence or app interaction.</p>
-    </div>
-    <div class="card">
-      <h3>Referral boost</h3>
-      <p>Invite friends with your code. You earn referral points when they join and complete their first tasks. After level 3, referrals are required to unlock the next level.</p>
-    </div>
-  </div>
-  <div class="center">
-    <a class="btn primary" href="#join" data-lane="promoter">Join to see tasks</a>
-  </div>
-</section>
-
-<section class="section" id="rewards">
-  <p class="eyebrow">Rewards & Growth</p>
-  <h2>Points convert to what you use</h2>
-  <div class="cols2">
-    <div class="panel">
-      <h3>Mobile Data (from Level 1)</h3>
-      <ul class="ticks">
-        <li>MTN, Glo, Airtel bundles — delivered to your own verified number</li>
-        <li>Redeem points for bundles starting from ₦50 equivalent</li>
-        <li>Instant delivery via licensed aggregator after task verification</li>
-      </ul>
-    </div>
-    <div class="panel">
-      <h3>Cash (unlocks as you grow)</h3>
-      <ul class="ticks">
-        <li>Levels 1–3: Data rewards only</li>
-        <li>Level 4+: Cash redemption unlocks (KYC Tier 2 + age verified)</li>
-        <li>Minimum ₦1,000 balance, batched payouts via Flutterwave</li>
-        <li>Referral points accelerate level progression after Level 3</li>
-      </ul>
-    </div>
-  </div>
-  <div class="center">
-    <a class="btn outline" href="#faq">How levels work</a>
-  </div>
-</section>
-
-<section class="section dark" id="faq">
-  <p class="eyebrow">Questions</p>
-  <h2>Straight answers</h2>
-  <div class="faq" id="faqList">
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a1" id="faq-q1">Do I need followers or a social account to join?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a1" role="region" aria-labelledby="faq-q1"><p>No. Anyone with a Nigerian phone number can join. No follower count, no YouTube/Facebook link required. Tasks are assigned based on availability, not your social reach.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a2" id="faq-q2">How do I earn points?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a2" role="region" aria-labelledby="faq-q2"><p>Complete assigned tasks — each shows its point value upfront. Tasks include social actions, verifications, and referrals. Points add to your balance instantly after verification.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a3" id="faq-q3">What can I redeem points for?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a3" role="region" aria-labelledby="faq-q3"><p>Mobile data bundles (MTN, Glo, Airtel) from Level 1. Cash redemption unlocks at Level 4+ with KYC verification. Minimum cash payout ₦1,000.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a4" id="faq-q4">How do levels work?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a4" role="region" aria-labelledby="faq-q4"><p>Complete tasks to earn points and level up. Levels 1–3 unlock via points alone. From Level 4, you need both points AND a minimum number of active referrals to progress. Higher levels = better task access, higher point tasks, cash eligibility.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a5" id="faq-q5">Do referrals earn me cash?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a5" role="region" aria-labelledby="faq-q5"><p>Referrals earn you POINTS, not cash directly. Referral points boost your level progression — especially critical after Level 3 where referrals are required to advance. No joining fee, no payment for recruiting, no income promises.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a6" id="faq-q6">When do I actually get paid?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a6" role="region" aria-labelledby="faq-q6"><p>Data rewards: within 48–72 hours after task verification, delivered to your verified number. Cash: after Level 4 unlock, KYC Tier 2 + age verification, minimum ₦1,000 balance, batched weekly. Payout rails are still being built and checked with providers.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a7" id="faq-q7">Is this a pyramid scheme?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a7" role="region" aria-labelledby="faq-q7"><p>No. There is no joining fee, no payment for recruiting people, and no multi-level commission. You earn by completing tasks yourself. Referrals only give you points to progress levels — they never pay cash by themselves. The system is designed so it cannot become a pyramid scheme.</p></div>
-    <button class="q" type="button" aria-expanded="false" aria-controls="faq-a8" id="faq-q8">Can I trust this site?<span aria-hidden="true">+</span></button>
-    <div class="a" id="faq-a8" role="region" aria-labelledby="faq-q8"><p>Judge what exists, not what is promised. This page is a pilot recruitment page during the build. No testimonials, no customer counts and no earnings figures appear here because none are proven yet.</p></div>
-  </div>
-</section>
-
-<section class="section" id="join">
-  <p class="eyebrow">Pilot list</p>
-  <h2>Register interest</h2>
-  <div class="invite" id="inviteBanner" hidden>
-    <p id="inviteText" role="status"></p>
-  </div>
-  <div class="tabs" role="radiogroup" aria-label="Register as">
-    <button class="tab active" type="button" role="radio" aria-checked="true" data-form="promoter" tabindex="0">Promoter</button>
-  </div>
-
-  <form id="leadForm" novalidate>
-    <div class="grid2">
-      <label for="fName">Full name</label>
-      <input id="fName" name="name" type="text" autocomplete="name" required aria-describedby="formStatus">
-      <label for="fPhone">Phone number</label>
-      <input id="fPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="08XX XXX XXXX" required aria-describedby="formStatus">
-    </div>
-    <label for="fNote">City or note (optional)</label>
-    <input id="fNote" name="note" type="text" placeholder="Your city or what you want to promote">
-    <p class="form-status" id="formStatus" role="status"></p>
-    <p class="fine">By joining, you agree Promota may store your name, phone number and note to contact you about the pilot. Your number stays private and is never shown to other members. No payment is collected anywhere on this page.</p>
-    <button class="btn primary big" type="submit" id="submitBtn">Join the pilot list</button>
-  </form>
-
-  <div class="success" id="successBox" hidden>
-    <h3 id="successTitle">You are on the list</h3>
-    <p id="successText"></p>
-    <div class="refbox" id="refBox" hidden>
-      <p class="refcode">Your invite code: <strong id="refCode"></strong></p>
-      <p><a id="refLink" href="#join"></a></p>
-      <p class="fine" id="refPosition" role="status"></p>
-      <div class="share-row">
-        <button class="btn outline" type="button" id="copyRef">Copy invite link</button>
-        <a class="btn ghost" id="shareWa" href="https://wa.me/" target="_blank" rel="noopener">WhatsApp</a>
-        <a class="btn ghost" id="shareTw" href="https://twitter.com/" target="_blank" rel="noopener">X</a>
-        <a class="btn ghost" id="shareFb" href="https://www.facebook.com/" target="_blank" rel="noopener">Facebook</a>
+    <!-- CTA Section -->
+    <section class="py-24 md:py-32 bg-[var(--accent)]/10 border-t border-b border-[var(--border)]">
+      <div class="max-w-4xl mx-auto px-6 text-center">
+        <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          Ready to transform your football content?
+        </h2>
+        <p class="text-[var(--muted)] text-lg mb-8 max-w-2xl mx-auto">
+          Join thousands of creators who are already using Promota to reach football fans worldwide.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <button id="final-cta" class="rounded-md font-medium px-8 py-3 border border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
+            Get Started Free
+          </button>
+        </div>
+        <p class="mt-6 text-sm text-[var(--muted)]">
+          No credit card required. Instant access.
+        </p>
       </div>
-      <p class="fine">Invites earn you referral points. They never earn cash by themselves — rewards come only from completed tasks. Anyone who promises otherwise is not us.</p>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-16 bg-[var(--bg-subtle)] border-t border-[var(--border)]">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+        <div class="col-span-1 md:col-span-2">
+          <a href="#" class="text-2xl font-semibold tracking-tight">
+            <span class="text-[var(--accent)]">Promota</span> Football
+          </a>
+          <p class="text-[var(--muted)] mt-4">Intelligent content promotion for the beautiful game.</p>
+        </div>
+        <div>
+          <h4 class="font-medium mb-4 text-sm uppercase tracked">Product</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#features" class="footer-link">Features</a></li>
+            <li><a href="#how-it-works" class="footer-link">How It Works</a></li>
+            <li><a href="#pricing" class="footer-link">Pricing</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-medium mb-4 text-sm uppercase tracked">Company</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#" class="footer-link">About</a></li>
+            <li><a href="#" class="footer-link">Blog</a></li>
+            <li><a href="#" class="footer-link">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-medium mb-4 text-sm uppercase tracked">Legal</h4>
+          <ul class="space-y-2 text-sm">
+            <li><a href="#" class="footer-link">Privacy</a></li>
+            <li><a href="#" class="footer-link">Terms</a></li>
+            <li><a href="#" class="footer-link">Cookies</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4">
+        <p class="text-[var(--muted)] text-sm">2024 Promota. All rights reserved.</p>
+        <div class="flex gap-3">
+          <a href="#" class="footer-link hover:text-[var(--accent)] transition-colors" aria-label="Twitter">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.27 8.502 3.173 7.136-8.647-4.264 1.856 7.031 6.835L24.558 2.5l-8.76 6.08-5.236-4.317-1.007-.761-5.408 4.518-5.405-4.516L3.653 14l5.43 2.295L.75 9.6l3.452-5.05ZM12 5.173l5.726 4.808L12 12l-5.726 4.807-5.727-4.808L12 5.173z"/>
+            </svg>
+          </a>
+          <a href="#" class="footer-link hover:text-[var(--accent)] transition-colors" aria-label="LinkedIn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.447 6.318c-.772 1.173-.297 3.088.515 4.368.812 1.28 2.251 1.306 3.062.307 1.505-1.518 1.897-3.264.865-4.781-.576-1.077-1.589-1.597-2.914-1.597-1.325 0-2.353.577-3.177 1.576-1.515 1.778-1.895 4.208-.518 5.983.27 2.873 2.025 5.618.517 6.05.244.233.505.37.84.37.305 0 .576-.102.797-.31.387-.75.78-1.62 1.027-2.614.515-2.175.467-4.768-.022-6.733zM12 15.63l-3.703 1.958L3.99 9.56l-3.026 5.527L12 .14l8.726 5.376L20.01 9.56l-3.704 1.958L12 15.63z"/>
+            </svg>
+          </a>
+          <a href="#" class="footer-link hover:text-[var(--accent)] transition-colors" aria-label="Instagram">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+            </svg>
+          </a>
+        </div>
+      </div>
     </div>
-    <button class="btn outline" type="button" id="againBtn">Add another person</button>
+  </footer>
+
+  <!-- Login/Signup Modal -->
+  <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="relative bg-[var(--card)] rounded-2xl w-full max-w-md p-8 md:p-12 border border-[var(--border)] transform scale-95 opacity-0 transition-all duration-300" id="modal-content">
+      <button id="close-modal" class="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-transparent transition-all" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      
+      <div class="mb-6">
+        <h3 class="text-2xl font-bold mb-2" id="modal-title">Login</h3>
+        <p class="text-[var(--muted)] text-sm" id="modal-subtitle">Enter your credentials</p>
+      </div>
+
+      <form id="auth-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-2" for="email">Email</label>
+          <input type="email" id="email" name="email" required class="rounded-md border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-colors" placeholder="name@domain.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2" for="password">Password</label>
+          <input type="password" id="password" name="password" required class="rounded-md border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-colors" placeholder="••••••••">
+        </div>
+        <button type="submit" class="w-full rounded-md font-medium px-6 py-3 bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
+          Sign In
+        </button>
+      </form>
+
+      <div class="mt-6 text-center">
+        <p class="text-[var(--muted)] text-sm">Don't have an account?</p>
+        <button id="switch-to-signup" class="rounded-md font-medium px-6 py-3 border border-[var(--border)] bg-transparent hover:bg-[var(--accent)] hover:text-[var(--accent)] transition-all">
+          Signup
+        </button>
+      </div>
+    </div>
   </div>
-</section>
 
-</main>
+  <script>
+    // Football animation
+    const canvas = document.getElementById('football-canvas');
+    const ctx = canvas.getContext('2d');
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-<footer class="footer">
-  <div class="foot-inner">
-    <div>
-      <h2>Promota</h2>
-      <p>Promota – Nigeria pilot (lead‑capture only).</p>
-    </div>
-    <div>
-      <h2>Status</h2>
-      <p>Pilot build. Not yet open. No payment is processed on this site.</p>
-    </div>
-    <div>
-      <h2>Policy</h2>
-      <p>Every paid post carries a disclosure tag. No fake likes, follows or views are bought or sold.</p>
-    </div>
-  </div>
-  <p class="copy">Promota is a pilot project. Earnings depend on checked outcomes and are not guaranteed.</p>
-  <nav class="legal-links">
-    <a href="terms.html">Terms of Service</a> · <a href="privacy.html">Privacy Policy</a> · <a href="refund.html">Refund Policy</a>
-  </nav>
-</footer>
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight * 0.6;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
-<script src="config.js"></script>
-<script src="app.js"></script>
+    // Football shapes and colors
+    const panels = [
+      { color: '#000000', x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+      { color: '#FFFFFF', x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+      { color: '#000000', x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
+      { color: '#FFFFFF', x: 0, y: 0, width: 0.25, height: 0.5 },
+      { color: '#000000', x: 0.25, y: 0, width: 0.25, height: 0.5 },
+      { color: '#FFFFFF', x: 0.5, y: 0, width: 0.25, height: 0.5 },
+      { color: '#000000', x: 0.75, y: 0, width: 0.25, height: 0.5 },
+      { color: '#FFFFFF', x: 0, y: 0.5, width: 0.25, height: 0.5 },
+    ];
+
+    let angle = 0;
+    let spinDirection = 1;
+
+    function drawFootball() {
+      if (prefersReducedMotion) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(canvas.width, canvas.height) * 0.4;
+
+      // Draw outer circle
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      if (!prefersReducedMotion) {
+        ctx.rotate(angle);
+      }
+
+      // Draw black and white panels
+      panels.forEach(panel => {
+        const panelWidth = canvas.width * panel.width;
+        const panelHeight = canvas.height * panel.height;
+        const x = centerX + (panel.x * canvas.width) - (panelWidth / 2);
+        const y = centerY + (panel.y * canvas.height) - (panelHeight / 2);
+
+        ctx.fillStyle = panel.color;
+        ctx.fillRect(x, y, panelWidth, panelHeight);
+      });
+
+      // Draw stitching
+      ctx.strokeStyle = '#FFFFFF33';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const x1 = centerX + Math.cos(a) * (radius * 0.85);
+        const y1 = centerY + Math.sin(a) * (radius * 0.85);
+        const x2 = centerX + Math.cos(a) * (radius * 0.95);
+        const y2 = centerY + Math.sin(a) * (radius * 0.95);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    // Animation loop
+    function animate() {
+      if (!prefersReducedMotion) {
+        angle += 0.02 * spinDirection;
+      }
+      drawFootball();
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+
+    // Reduced motion handling
+    const rmmq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    rmmq.addEventListener('change', e => {
+      if (e.matches) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      } else {
+        animate();
+      }
+    });
+
+    // Modal logic
+    const modal = document.getElementById('modal');
+    const modalContent = document.getElementById('modal-content');
+    const loginBtn = document.getElementById('login-btn');
+    const signupBtn = document.getElementById('signup-btn');
+    const loginCta = document.getElementById('login-cta');
+    const signupCta = document.getElementById('signup-cta');
+    const finalCta = document.getElementById('final-cta');
+    const closeModal = document.getElementById('close-modal');
+    const switchToSignup = document.getElementById('switch-to-signup');
+    const authForm = document.getElementById('auth-form');
+    const modalTitle = document.getElementById('modal-title');
+    const modalSubtitle = document.getElementById('modal-subtitle');
+
+    function openModal(mode) {
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modalContent.classList.remove('scale-95', 'opacity-0');
+        modalContent.classList.add('scale-100', 'opacity-100');
+      }, 10);
+      
+      if (mode === 'login') {
+        modalTitle.textContent = 'Login';
+        modalSubtitle.textContent = 'Enter your credentials';
+        authForm.reset();
+      } else {
+        modalTitle.textContent = 'Signup';
+        modalSubtitle.textContent = 'Create your account';
+        authForm.reset();
+      }
+    }
+
+    function closeModalFn() {
+      modalContent.classList.add('scale-95', 'opacity-0');
+      modalContent.classList.remove('scale-100', 'opacity-100');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 300);
+    }
+
+    // Event listeners
+    loginBtn.addEventListener('click', () => openModal('login'));
+    signupBtn.addEventListener('click', () => openModal('signup'));
+    finalCta.addEventListener('click', () => openModal('login'));
+    closeModal.addEventListener('click', closeModalFn);
+    switchToSignup.addEventListener('click', () => openModal('signup'));
+
+    // Close on overlay click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModalFn();
+    });
+
+    // Form submission (prevent default for demo)
+    authForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      closeModalFn();
+      // In production, would submit to API
+      alert('Authentication submitted!');
+    });
+
+    // Initial focus trap
+    setTimeout(() => {
+      const firstFocusable = modalContent.querySelector('input, button');
+      if (firstFocusable) firstFocusable.focus();
+    }, 350);
+  </script>
 </body>
 </html>
