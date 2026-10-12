@@ -95,7 +95,7 @@ insert into settings(key, value, value_type, label, group_name) values
    'How many raffle tickets a promoter earns per 100 points from qualified tasks in the month','competitions'),
   ('competitions.raffle_max_tickets_per_promoter', '{"v":50}'::jsonb, 'int',
    'Maximum raffle tickets any promoter may accumulate per monthly draw','competitions'),
-  ('competitions.raffle_draw_date', '{"v":"28"}'::jsonb, 'text',
+  ('competitions.raffle_draw_date', '{"v":"28"}'::jsonb, 'string',
    'Day of month raffle draw happens (1–28). Set to 28 for end‑of‑month.','competitions'),
   ('ambassador.junior_stipend_minor', '{"v":2500000}'::jsonb, 'int', -- ₦25,000 in kobo
    'Monthly stipend for Junior Ambassador tier','ambassador'),
