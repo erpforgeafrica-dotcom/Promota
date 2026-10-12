@@ -35,7 +35,7 @@ create table competition_entries (
   rank             integer,                       -- computed at draw time; null = not in prize tier
   entered_at       timestamptz not null default now(),
   -- uniqueness: one entry per promoter per competition
-  constraint competition_entries_unique promoter_comp unique (profile_id, competition_id)
+  constraint competition_entries_unique unique (profile_id, competition_id)
 );
 
 create index competition_entries_comp_idx on competition_entries(competition_id);
