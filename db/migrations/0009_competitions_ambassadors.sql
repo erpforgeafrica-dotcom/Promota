@@ -115,7 +115,7 @@ on conflict (key) do nothing;
 -- 6. computed function: current active competition
 -- ---------------------------------------------------------------------
 create or replace function current_competition()
-returns table (id uuid, title text, kind text, start_at timestamptz, end_at timestamz) language sql stable as $$
+returns table (id uuid, title text, kind text, start_at timestamptz, end_at timestamptz) language sql stable as $$
   select id, title, kind, start_at, end_at from competitions
    where is_active = true
    order by start_at desc

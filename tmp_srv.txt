@@ -1,0 +1,2 @@
+promota web+api listening on http://0.0.0.0:8080 (supabase configured: false)
+[worker] disabled via WORKER_ENABLED=false
