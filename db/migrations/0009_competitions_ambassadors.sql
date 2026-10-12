@@ -125,7 +125,7 @@ $$;
 -- ---------------------------------------------------------------------
 -- 7. computed function: promoter's raffle ticket count for current month
 -- ---------------------------------------------------------------------
-create or function promoter_raffle_tickets(p_profile uuid)
+create or replace function promoter_raffle_tickets(p_profile uuid)
 returns integer language sql stable as $$
   select coalesce(sum(score / 100), 0)::integer
     from competition_entries
