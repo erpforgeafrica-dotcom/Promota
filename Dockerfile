@@ -9,6 +9,11 @@ ENV NODE_ENV=production
 
 COPY apps/web ./apps/web
 COPY server.mjs ./server.mjs
+# server.mjs imports the API router and outbox worker, which in turn import the
+# provider adapters. All three must be in the image or the container exits at
+# boot with ERR_MODULE_NOT_FOUND and never becomes healthy.
+COPY api ./api
+COPY providers ./providers
 
 USER node
 EXPOSE 8080

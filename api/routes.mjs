@@ -62,10 +62,10 @@ export async function requestOtp(req) {
     const info = await termii.lookupNumber(e164);
     const { pinId } = await termii.sendOtp({ to: e164, pin });
 
-    // The PIN is returned only because this is a pilot and the caller must be
-    // able to complete the flow end to end. It is never logged. Remove this
-    // field (and the devOTP response) before any public launch.
-    return ok({ sent: true, phone: phone, network: info.network }, 200);
+    // pinId MUST be returned: verifyOtp() cannot be called without it, so
+    // omitting it made the whole OTP login flow impossible. The PIN itself is
+    // NEVER returned or logged — only the id Termii uses to verify it later.
+    return ok({ sent: true, phone: phone, network: info.network, pinId }, 200);
   } catch (e) {
     return fail(`could not send the code: ${String(e.message).slice(0, 120)}`, 502);
   }

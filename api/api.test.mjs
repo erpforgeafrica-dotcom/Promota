@@ -157,6 +157,37 @@ const routes = await import('../api/routes.mjs');
   check('OTP verify refuses without a pin', noPin.status === 400);
 }
 
+/* --------------------------------------------- OTP request -> verify wiring */
+{
+  // Regression: requestOtp() discarded Termii's pin_id, so verifyOtp() could
+  // never be called and the whole OTP login flow was impossible. The provider
+  // is stubbed here so this stays an offline test.
+  const savedKey = process.env.TERMII_API_KEY;
+  const realFetch = globalThis.fetch;
+  process.env.TERMII_API_KEY = 'test-termii-key';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    const body = u.includes('insight/number/query')
+      ? { operator: 'MTN' }
+      : u.includes('sms/otp/send')
+        ? { pin_id: 'PIN-ABC-123' }
+        : {};
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const r = await routes.requestOtp({ body: { phone: '08030000000' }, headers: {} });
+    check('OTP request succeeds with a valid phone', r.status === 200 && r.body.sent === true, JSON.stringify(r.body));
+    check('OTP request returns the pinId that verifyOtp() requires', r.body.pinId === 'PIN-ABC-123', JSON.stringify(r.body));
+    check('OTP request never echoes the raw PIN', !('pin' in r.body), JSON.stringify(r.body));
+
+    const v = await routes.verifyOtp({ body: { phone: '08030000000' }, headers: {} });
+    check('OTP verify still refuses when no pin is supplied', v.status === 400, JSON.stringify(v));
+  } finally {
+    globalThis.fetch = realFetch;
+    if (savedKey === undefined) delete process.env.TERMII_API_KEY; else process.env.TERMII_API_KEY = savedKey;
+  }
+}
+
 /* ------------------------------------------------------- health endpoint */
 {
   const h = await routes.health();
