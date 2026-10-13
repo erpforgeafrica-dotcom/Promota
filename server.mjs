@@ -147,9 +147,23 @@ const PATTERNS = [
 ];
 
 async function handleApi(req, res, url) {
+  const headOnly = req.method === 'HEAD';
+
+  // Validate the body BEFORE routing: a POST with a non-JSON body is a
+  // client error (400) even when the path itself is unknown.
+  let body = null;
+  let raw = '';
+  if (req.method === 'POST') {
+    raw = await readBody(req);
+    if (raw) {
+      try { body = JSON.parse(raw); }
+      catch { return json(res, 400, { error: 'body must be JSON' }, headOnly); }
+    } else body = {};
+    req.body = body;
+  }
+
   const key = `${req.method} ${url.pathname}`;
   const handler = routes[key];
-  const headOnly = req.method === 'HEAD';
 
   const pattern = PATTERNS.find(p => p.method === req.method && p.re.test(url.pathname));
   const matched = handler
@@ -164,16 +178,6 @@ async function handleApi(req, res, url) {
       : null;
 
   if (!matched) return json(res, 404, { error: 'no such endpoint' }, headOnly);
-
-  let body = null;
-  let raw = '';
-  if (req.method === 'POST') {
-    raw = await readBody(req);
-    if (raw) {
-      try { body = JSON.parse(raw); }
-      catch { return json(res, 400, { error: 'body must be JSON' }, headOnly); }
-    } else body = {};
-  }
 
   try {
     const result = await matched.fn(req, matched.params, raw);
