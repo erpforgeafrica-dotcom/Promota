@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Promota - Football Intelligence</title>
+  <title>Promota</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0a0e17;
@@ -35,7 +35,7 @@
     }
 
     h1, h2, h3, h4, h5, h6 {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Inter', sans-serif;
     }
 
     .footer-link {
@@ -46,20 +46,16 @@
       color: var(--accent);
     }
 
-    /* Football animation canvas */
-    #football-canvas {
-      display: block;
+    body {
+      min-h-screen;
     }
 
-    /* Reduced motion for accessibility */
-    @media (prefers-reduced-motion: reduce) {
-      .float-animate {
-        animation: none;
-      }
-      .spin-slow {
-        animation-duration: 20s !important;
-        transition-duration: 0.01ms !important;
-      }
+    .relative .float-animate {
+      animation: none;
+    }
+    .spin-slow {
+      animation-duration: 20s !important;
+      transition-duration: 0.01ms !important;
     }
   </style>
 </head>
@@ -68,7 +64,7 @@
   <nav class="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] backdrop-blur-sm background-[var(--bg-subtle)]">
     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
       <a href="#" class="text-2xl font-semibold tracking-tight">
-        <span class="text-[var(--accent)]">Promota</span> Football
+        <span class="text-[var(--accent)]">Promota</span>
       </a>
       <div class="hidden md:flex items-center gap-8">
         <a href="#features" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">Features</a>
@@ -88,36 +84,17 @@
 
   <!-- Hero Section -->
   <main class="relative min-h-screen">
-    <!-- Football Canvas Animation -->
-    <canvas id="football-canvas" class="absolute inset-0 w-full h-full" aria-hidden="true"></canvas>
-
-    <!-- Overlay gradient -->
-    <div class="absolute inset-0 bg-gradient-to-b from-[var(--bg)] via-[var(--bg-subtle)] to-transparent"></div>
-
     <!-- Content Layer -->
     <div class="relative z-10 min-h-screen max-w-7xl mx-auto px-6 py-16 md:py-24 flex flex-col items-center justify-center gap-8 text-center">
       
-      <!-- Football Trophy Icon -->
-      <div class="relative mb-12">
-        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5" class="mx-auto">
-          <circle cx="12" cy="12" r="9" stroke-opacity="0.3"/>
-          <path d="M8 14s1.5 2 4 2 4-2 4-2" stroke-opacity="1"/>
-          <line x1="9" y1="9" x2=15" y2="9"/>
-          <line x1="12" y1="17" x2="12" y2="22"/>
-          <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v4"/>
-        </svg>
-        <div class="absolute -inset-2 bg-gradient-to-br from-[var(--accent)] to-[var(--accent-bright)] rounded-full opacity-30 blur-sm"></div>
-      </div>
-
       <!-- Heading -->
       <h1 class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-none mb-6">
-        <span class="block">Football</span>
-        <span class="block">Intelligence</span>
+        <span class="block">Promota</span>
       </h1>
       <p class="text-lg md:text-xl text-[var(--muted)] max-w-2xl mx-auto mb-12">
-        The intelligent content promotion platform for football fans and creators.
+        The intelligent content promotion platform for creators and businesses.
       </p>
-
+    
       <!-- CTA Buttons -->
       <div class="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
         <button id="login-cta" class="rounded-md font-medium px-6 py-3 border border-[var(--border)] bg-transparent text-[var(--fg)] hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-all">
@@ -148,7 +125,7 @@
               </svg>
             </div>
             <h3 class="text-xl font-bold mb-3">Smart Analytics</h3>
-            <p class="text-[var(--muted)] text-sm">Data-driven insights for football content performance</p>
+            <p class="text-[var(--muted)] text-sm">Data-driven insights for content performance</p>
           </div>
           <div>
             <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
@@ -172,7 +149,7 @@
               </svg>
             </div>
             <h3 class="text-xl font-bold mb-3">Fan Engagement</h3>
-            <p class="text-[var(--muted)] text-sm">Interactive experiences for true supporters</p>
+            <p class="text-[var(--muted)] text-sm">Interactive experiences for supporters</p>
           </div>
         </div>
       </div>
@@ -187,12 +164,12 @@
               How It Works
             </h2>
             <p class="text-[var(--muted)] text-lg mb-8">
-              Transform football analysis into compelling content in 3 simple steps.
+              Transform content analysis into compelling content in 3 simple steps.
             </p>
             <ol class="list-decimal list-inside space-y-4 text-sm">
               <li>
                 <strong class="font-semibold">Connect</strong>
-                Integrate your football data and content sources
+                Integrate your data and content sources
               </li>
               <li>
                 <strong class="font-semibold">Analyze</strong>
@@ -200,7 +177,7 @@
               </li>
               <li>
                 <strong class="font-semibold">Distribute</strong>
-                Automated promotion to reach more fans
+                Automated promotion to reach more audiences
               </li>
             </ol>
           </div>
@@ -223,7 +200,7 @@
                 <p class="text-[var(--muted)] mt-2">AI analysis</p>
               </div>
               <div class="absolute bottom-4 left-4 right-4 px-6 py-4 bg-[var(--card)] rounded-bl-2xl text-center">
-                <p class="text-[var(--muted)] text-sm">Experience the future of football content</p>
+                <p class="text-[var(--muted)] text-sm">Experience the future of content</p>
               </div>
             </div>
           </div>
@@ -235,10 +212,10 @@
     <section class="py-24 md:py-32 bg-[var(--accent)]/10 border-t border-b border-[var(--border)]">
       <div class="max-w-4xl mx-auto px-6 text-center">
         <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-          Ready to transform your football content?
+          Ready to transform your content?
         </h2>
         <p class="text-[var(--muted)] text-lg mb-8 max-w-2xl mx-auto">
-          Join thousands of creators who are already using Promota to reach football fans worldwide.
+          Join thousands of creators who are already using Promota to reach audiences worldwide.
         </p>
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
           <button id="final-cta" class="rounded-md font-medium px-8 py-3 border border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
@@ -258,9 +235,9 @@
       <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
         <div class="col-span-1 md:col-span-2">
           <a href="#" class="text-2xl font-semibold tracking-tight">
-            <span class="text-[var(--accent)]">Promota</span> Football
+            <span class="text-[var(--accent)]">Promota</span>
           </a>
-          <p class="text-[var(--muted)] mt-4">Intelligent content promotion for the beautiful game.</p>
+          <p class="text-[var(--muted)] mt-4">Intelligent content promotion.</p>
         </div>
         <div>
           <h4 class="font-medium mb-4 text-sm uppercase tracked">Product</h4>
@@ -351,242 +328,14 @@
   </div>
 
   <script>
-    // WebGL 3D Football Animation
-    const canvas = document.getElementById('football-canvas');
-    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    // Reduced motion for accessibility
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight * 0.6;
+      // Canvas removed — no-op
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-
-    // Fallback to 2D canvas if WebGL not available
-    if (!gl) {
-      const ctx2d = canvas.getContext('2d');
-        const panels = [
-      { color: '#000000', x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
-      { color: '#FFFFFF', x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
-      { color: '#000000', x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
-      { color: '#FFFFFF', x: 0, y: 0, width: 0.25, height: 0.5 },
-      { color: '#000000', x: 0.25, y: 0, width: 0.25, height: 0.5 },
-      { color: '#FFFFFF', x: 0.5, y: 0, width: 0.25, height: 0.5 },
-      { color: '#000000', x: 0.75, y: 0, width: 0.25, height: 0.5 },
-      { color: '#FFFFFF', x: 0, y: 0.5, width: 0.25, height: 0.5 },
-    ];
-
-      let angle = 0;
-      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      ctx2d.fillStyle = '#000';
-      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw simple 2D football pattern
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const radius = Math.min(canvas.width, canvas.height) * 0.4;
-
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        const x1 = centerX + Math.cos(a) * radius * 0.5;
-        const y1 = centerY + Math.sin(a) * radius * 0.5;
-        const x2 = centerX + Math.cos(a) * radius * 0.55;
-        const y2 = centerY + Math.sin(a) * radius * 0.55;
-        ctx2d.fillStyle = i % 2 === 0 ? '#000' : '#fff';
-        ctx2d.fillRect(x1, y1, 20, 10);
-      }
-      return;
-    }
-
-    // WebGL setup
-    const vertexShaderSource = `#version 300 es
-      in vec3 aPosition;
-      in vec3 aNormal;
-      uniform mat4 uModelViewMatrix;
-      uniform mat4 uProjectionMatrix;
-      uniform mat3 uNormalMatrix;
-      out vec3 vNormal;
-      void main() {
-        vNormal = uNormalMatrix * aNormal;
-        gl_Position = uProjectionMatrix * uModelViewMatrix * vec4(aPosition, 1.0);
-      }`;
-
-    const fragmentShaderSource = `#version 300 es
-      precision highp float;
-      in vec3 vNormal;
-      out vec4 fragColor;
-      uniform vec3 uLightDirection;
-      uniform vec3 uAmbient;
-      uniform vec3 uDiffuse;
-      uniform vec3 uSpecular;
-      uniform float uShininess;
-      void main() {
-        vec3 normal = normalize(vNormal);
-        float ambient = dot(normal, uAmbient);
-        float diffuse = max(dot(normal, uLightDirection), 0.0);
-        float specular = 0.0;
-        if (diffuse > 0.0) {
-          vec3 viewDirection = normalize(-vec3(gl_FragCoord.zgl_FragCoord.z, 0.0, 0.0)); // simplified
-          specular = pow(max(dot(normal, viewDirection), 0.0), uShininess);
-        }
-        fragColor = vec4(uAmbient * uAmbient + uDiffuse * diffuse + uSpecular * specular, 1.0);
-      }`;
-
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, vertexShaderSource);
-    gl.compileShader(vertexShader);
-
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, fragmentShaderSource);
-    gl.compileShader(fragmentShader);
-
-    if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS) || !gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-      console.error('Shader compilation error:', gl.getShaderInfoLog(vertexShader), gl.getShaderInfoLog(fragmentShader));
-      // Fallback to 2D
-      const ctx2d = canvas.getContext('2d');
-      let angle = 0;
-      canvas.addEventListener('resize', () => {
-        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-      });
-      return;
-    }
-
-    const program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Program linking error:', gl.getProgramInfoLog(program));
-      return;
-    }
-
-    gl.useProgram(program);
-
-    // Get attribute and uniform locations
-    const positionLocation = gl.getAttribLocation(program, 'aPosition');
-    const normalLocation = gl.getAttribLocation(program, 'aNormal');
-    const modelViewMatrixLocation = gl.getUniformLocation(program, 'uModelViewMatrix');
-    const projectionMatrixLocation = gl.getUniformLocation(program, 'uProjectionMatrix');
-    const normalMatrixLocation = gl.getUniformLocation(program, 'uNormalMatrix');
-    const lightDirectionLocation = gl.getUniformLocation(program, 'uLightDirection');
-    const ambientLocation = gl.getUniformLocation(program, 'uAmbient');
-    const diffuseLocation = gl.getUniformLocation(program, 'uDiffuse');
-    const specularLocation = gl.getUniformLocation(program, 'uSpecular');
-    const shininessLocation = gl.getUniformLocation(program, 'uShininess');
-
-    // Football geometry - simplified dodecahedron with black/white panels
-    const positions = [];
-    const normals = [];
-
-    // Create a spherical shape with panel divisions
-    const radius = 0.5;
-    const segments = 32;
-
-    for (let lat = 0; lat <= segments; lat++) {
-      const theta = (lat / segments) * Math.PI;
-      for (let lon = 0; lon <= segments; lon++) {
-        const phi = (lon / segments) * 2 * Math.PI;
-        
-        const x = radius * Math.sin(theta) * Math.cos(phi);
-        const y = radius * Math.cos(theta);
-        const z = radius * Math.sin(theta) * Math.sin(phi);
-        
-        // Normalized normal
-        const nx = x / radius;
-        const ny = y / radius;
-        const nz = z / radius;
-        
-        positions.push(x, y, z);
-        normals.push(nx, ny, nz);
-      }
-    }
-
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-    const normalBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
-
-    // Projection matrix
-    const projectionMatrix = mat4.create();
-    mat4.perspective(projectionMatrix, 45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100.0);
-
-    // Model view matrix
-    const modelViewMatrix = mat4.create();
-    mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0, -2]);
-
-    let angle = 0;
-    const spinSpeed = 0.01;
-
-    // Light settings
-    const lightDirection = [0.5, 0.5, 1.0];
-    const ambient = [0.2, 0.2, 0.2];
-    const diffuse = [1.0, 1.0, 1.0];
-    const specular = [0.5, 0.5, 0.5];
-    const shininess = 32.0;
-
-    // Animation loop
-    function animate() {
-      if (prefersReducedMotion) return;
-
-      angle += spinSpeed;
-      mat4.rotate(modelViewMatrix, modelViewMatrix, spinSpeed, [0, 1, 0]);
-
-      // Update uniforms
-      gl.uniformMatrix4fv(modelViewMatrixLocation, false, modelViewMatrix);
-      gl.uniformMatrix4fv(projectionMatrixLocation, false, projectionMatrix);
-      
-      // Calculate normal matrix (inverse transpose of model view 3x3)
-      const normalMatrix = mat3.create();
-      mat4.getNormal(normalMatrix, modelViewMatrix);
-      gl.uniformMatrix3fv(normalMatrixLocation, false, normalMatrix);
-
-      gl.uniform3fv(lightDirectionLocation, lightDirection);
-      gl.uniform3fv(ambientLocation, ambient);
-      gl.uniform3fv(diffuseLocation, diffuse);
-      gl.uniform3fv(specularLocation, specular);
-      gl.uniform1f(shininessLocation, shininess);
-
-      // Clear and draw
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(0.02, 0.03, 0.05, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-      gl.enable(gl.DEPTH_TEST);
-      gl.enable(gl.CULL_FACE);
-
-      // Set attributes
-      gl.enableVertexAttribArray(positionLocation);
-      gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
-
-      gl.enableVertexAttribArray(normalLocation);
-      gl.vertexAttribPointer(normalLocation, 3, gl.FLOAT, false, 0, 0);
-
-      gl.drawArrays(gl.TRIANGLES, 0, positions.length / 3);
-
-      requestAnimationFrame(animate);
-    }
-
-    // Reduced motion handling
-    const rmmq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    rmmq.addEventListener('change', e => {
-      if (e.matches) {
-        gl.disable(gl.DEPTH_TEST);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-      } else {
-        gl.enable(gl.DEPTH_TEST);
-        animate();
-      }
-    });
-
-    // Initialize after DOM ready
-    setTimeout(() => {
-      requestAnimationFrame(animate);
-    }, 100);
 
     // Modal logic
     const modal = document.getElementById('modal');
