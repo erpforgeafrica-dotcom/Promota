@@ -417,6 +417,27 @@ input[aria-invalid="true"] { border-color: var(--danger); }
   padding: 24px; background: rgb(62 207 142 / .06);
 }
 
+/* ---------- modal ---------- */
+.modal[hidden] { display: none; }
+.modal {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  background: rgb(4 18 11 / .72); padding: 22px;
+}
+.modal-card {
+  width: 100%; max-width: 430px;
+  background: var(--field-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px; padding: 28px;
+}
+.modal-card label { display: block; font-size: .85rem; margin: 14px 0 6px; }
+.modal-card input {
+  width: 100%; box-sizing: border-box;
+  background: var(--ink); color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: 3px;
+  padding: 11px 13px; font: inherit;
+}
+.modal-card form .btn { width: 100%; margin-top: 18px; }
+
 /* ---------- footer ---------- */
 .footer { border-top: 1px solid var(--line); padding: 40px 22px; }
 .foot-inner {

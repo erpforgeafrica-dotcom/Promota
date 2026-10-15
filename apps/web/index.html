@@ -3,405 +3,165 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Promota is the intelligent content promotion platform for creators and businesses.">
+  <meta name="theme-color" id="themeColor" content="#04120b">
   <title>Promota</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0a0e17;
-      --bg-subtle: #111827;
-      --fg: #f0f4f8;
-      --muted: #6b7c93;
-      --accent: #f59e0b;
-      --accent-bright: #fbbf24;
-      --card: #1a2235;
-      --border: #2a3a52;
-      --gold: #d4af37;
-      --silver: #c0c0c0;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--fg);
-      overflow-x: hidden;
-      margin: 0;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-      font-family: 'Inter', sans-serif;
-    }
-
-    .footer-link {
-      color: var(--muted);
-      transition: color 0.2s;
-    }
-    .footer-link:hover {
-      color: var(--accent);
-    }
-
-    body {
-      min-h-screen;
-    }
-
-    .relative .float-animate {
-      animation: none;
-    }
-    .spin-slow {
-      animation-duration: 20s !important;
-      transition-duration: 0.01ms !important;
-    }
-  </style>
+  <script src="/theme-boot.js"></script>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
+
   <!-- Navigation -->
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] backdrop-blur-sm background-[var(--bg-subtle)]">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <a href="#" class="text-2xl font-semibold tracking-tight">
-        <span class="text-[var(--accent)]">Promota</span>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a href="#" class="brand" aria-label="Promota home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </span>
+        <span class="brand-name"><span class="ow">Pro</span><span class="works">mota</span></span>
       </a>
-      <div class="hidden md:flex items-center gap-8">
-        <a href="#features" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">Features</a>
-        <a href="#how-it-works" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">How It Works</a>
-        <a href="#pricing" class="text-[var(--muted)] hover:text-[var(--fg)] transition-colors">Pricing</a>
+      <div class="links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#pricing">Pricing</a>
       </div>
-      <div class="flex items-center gap-3">
-        <button id="login-btn" class="rounded-md text-sm font-medium px-4 py-2 border border-[var(--border)] bg-transparent hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-all">
-          Login
-        </button>
-        <button id="signup-btn" class="rounded-md text-sm font-medium px-4 py-2 bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
-          Signup
-        </button>
+      <div class="nav-cta">
+        <button id="themeBtnNav" class="theme-btn" aria-pressed="false" aria-label="Toggle light and dark theme">Theme</button>
+        <button id="login-btn" class="btn ghost">Login</button>
+        <button id="signup-btn" class="btn gold">Signup</button>
       </div>
     </div>
   </nav>
 
   <!-- Hero Section -->
-  <main class="relative min-h-screen">
-    <!-- Content Layer -->
-    <div class="relative z-10 min-h-screen max-w-7xl mx-auto px-6 py-16 md:py-24 flex flex-col items-center justify-center gap-8 text-center">
-      
-      <!-- Heading -->
-      <h1 class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-none mb-6">
-        <span class="block">Promota</span>
-      </h1>
-      <p class="text-lg md:text-xl text-[var(--muted)] max-w-2xl mx-auto mb-12">
-        The intelligent content promotion platform for creators and businesses.
-      </p>
-    
-      <!-- CTA Buttons -->
-      <div class="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-        <button id="login-cta" class="rounded-md font-medium px-6 py-3 border border-[var(--border)] bg-transparent text-[var(--fg)] hover:bg-[var(--accent)] hover:text-[var(--bg)] transition-all">
-          Login
-        </button>
-        <button id="signup-cta" class="rounded-md font-medium px-6 py-3 bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
-          Get Started
-        </button>
+  <main id="main">
+    <section class="hero">
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">Verified brand-promotion work</p>
+          <h1>Promota</h1>
+          <p class="lede">The intelligent content promotion platform for creators and businesses.</p>
+          <div class="hero-btns">
+            <button id="login-cta" class="btn ghost">Login</button>
+            <button id="signup-cta" class="btn gold big">Get Started</button>
+          </div>
+          <ul class="hero-facts">
+            <li><strong>Verified work</strong>Brand-promotion tasks with proof, not promises.</li>
+            <li><strong>Paid in data and cash</strong>Rewards promoters can actually use.</li>
+            <li><strong>Referrals that compound</strong>Qualified referrals lift level and earnings.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Smart</h3>
+          <p>AI analysis. Experience the future of content.</p>
+        </div>
       </div>
+    </section>
 
-      <!-- Scroll Indicator -->
-      <div class="mt-12 flex flex-col items-center gap-2 text-[var(--muted)]">
-        <span>Scroll</span>
-        <div class="w-6 h-6 border-2 border-[var(--border)] rounded-full animate-bounce" aria-hidden="true"></div>
-      </div>
-    </div>
-
-    <!-- Features Section (scrolled to) -->
-    <section id="features" class="py-24 md:py-32 bg-[var(--bg-subtle)]">
-      <div class="max-w-7xl mx-auto px-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-          <div>
-            <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
-                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                <path d="M2 17l10 5 10-5"/>
-                <path d="M2 12l10 5 10-5"/>
-              </svg>
-            </div>
-            <h3 class="text-xl font-bold mb-3">Smart Analytics</h3>
-            <p class="text-[var(--muted)] text-sm">Data-driven insights for content performance</p>
-          </div>
-          <div>
-            <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                <line x1="9" y1="9" x2="15" y2="9"/>
-                <line x1="12" y1="17" x2="12" y2="22"/>
-              </svg>
-            </div>
-            <h3 class="text-xl font-bold mb-3">Content Distribution</h3>
-            <p class="text-[var(--muted)] text-sm">Automated promotion across platforms</p>
-          </div>
-          <div>
-            <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-6">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                <path d="M12 8v4"/>
-                <path d="M9 12l2 2l4-2l2 2"/>
-                <path d="M15 12l2 2l-4-2l2-2"/>
-              </svg>
-            </div>
-            <h3 class="text-xl font-bold mb-3">Fan Engagement</h3>
-            <p class="text-[var(--muted)] text-sm">Interactive experiences for supporters</p>
-          </div>
+    <!-- Features Section -->
+    <section id="features" class="section">
+      <h2>Features</h2>
+      <div class="cards3">
+        <div class="card">
+          <h3>Smart Analytics</h3>
+          <p>Data-driven insights for content performance.</p>
+        </div>
+        <div class="card">
+          <h3>Content Distribution</h3>
+          <p>Automated promotion across platforms.</p>
+        </div>
+        <div class="card">
+          <h3>Fan Engagement</h3>
+          <p>Interactive experiences for supporters.</p>
         </div>
       </div>
     </section>
 
     <!-- How It Works -->
-    <section id="how-it-works" class="py-24 md:py-32 relative">
-      <div class="max-w-7xl mx-auto px-6">
-        <div class="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-6">
-              How It Works
-            </h2>
-            <p class="text-[var(--muted)] text-lg mb-8">
-              Transform content analysis into compelling content in 3 simple steps.
-            </p>
-            <ol class="list-decimal list-inside space-y-4 text-sm">
-              <li>
-                <strong class="font-semibold">Connect</strong>
-                Integrate your data and content sources
-              </li>
-              <li>
-                <strong class="font-semibold">Analyze</strong>
-                AI-powered insights and performance metrics
-              </li>
-              <li>
-                <strong class="font-semibold">Distribute</strong>
-                Automated promotion to reach more audiences
-              </li>
-            </ol>
-          </div>
-          <div class="relative">
-            <div class="rounded-2xl overflow-hidden bg-gradient-to-br from-[var(--card)] to-[var(--bg-subtle)] border border-[var(--border)]">
-              <svg width="400" height="300" viewBox="0 0 400 300" fill="none" class="opacity-30">
-                <path d="M200 0 C200 0 200 300 200 300 C200 300 400 300 400 300 C400 300 400 0 200 0 Z" fill="var(--bg-subtle)"/>
-                <circle cx="100" cy="150" r="50" fill="var(--accent)" opacity="0.4"/>
-                <circle cx="300" cy="150" r="50" fill="var(--accent-bright)" opacity="0.4"/>
-              </svg>
-              <div class="absolute inset-0 p-6 flex flex-col justify-center">
-                <div class="w-12 h-12 rounded-md bg-[var(--accent)]/20 flex items-center justify-center mb-4">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
-                  </svg>
-                </div>
-                <h4 class="font-medium text-[var(--fg)]">Smart</h4>
-                <p class="text-[var(--muted)] mt-2">AI analysis</p>
-              </div>
-              <div class="absolute bottom-4 left-4 right-4 px-6 py-4 bg-[var(--card)] rounded-bl-2xl text-center">
-                <p class="text-[var(--muted)] text-sm">Experience the future of content</p>
-              </div>
-            </div>
-          </div>
+    <section id="how-it-works" class="section dark">
+      <h2>How It Works</h2>
+      <p>Transform content analysis into compelling content in 3 simple steps.</p>
+      <div class="grid2">
+        <div class="panel">
+          <h3>1. Connect</h3>
+          <p>Integrate your data and content sources.</p>
+        </div>
+        <div class="panel">
+          <h3>2. Analyze</h3>
+          <p>AI-powered insights and performance metrics.</p>
+        </div>
+        <div class="panel">
+          <h3>3. Distribute</h3>
+          <p>Automated promotion to reach more audiences.</p>
+        </div>
+        <div class="panel">
+          <h3>Smart</h3>
+          <p>AI analysis. Experience the future of content.</p>
         </div>
       </div>
     </section>
 
     <!-- CTA Section -->
-    <section class="py-24 md:py-32 bg-[var(--accent)]/10 border-t border-b border-[var(--border)]">
-      <div class="max-w-4xl mx-auto px-6 text-center">
-        <h2 class="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-          Ready to transform your content?
-        </h2>
-        <p class="text-[var(--muted)] text-lg mb-8 max-w-2xl mx-auto">
-          Join thousands of creators who are already using Promota to reach audiences worldwide.
-        </p>
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-          <button id="final-cta" class="rounded-md font-medium px-8 py-3 border border-[var(--accent)] bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
-            Get Started Free
-          </button>
-        </div>
-        <p class="mt-6 text-sm text-[var(--muted)]">
-          No credit card required. Instant access.
-        </p>
+    <section id="pricing" class="section">
+      <h2>Ready to transform your content?</h2>
+      <p>Join thousands of creators who are already using Promota to reach audiences worldwide.</p>
+      <div class="hero-btns">
+        <button id="final-cta" class="btn gold big">Get Started Free</button>
       </div>
+      <p>No credit card required. Instant access.</p>
     </section>
   </main>
 
   <!-- Footer -->
-  <footer class="py-16 bg-[var(--bg-subtle)] border-t border-[var(--border)]">
-    <div class="max-w-7xl mx-auto px-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-        <div class="col-span-1 md:col-span-2">
-          <a href="#" class="text-2xl font-semibold tracking-tight">
-            <span class="text-[var(--accent)]">Promota</span>
-          </a>
-          <p class="text-[var(--muted)] mt-4">Intelligent content promotion.</p>
-        </div>
-        <div>
-          <h4 class="font-medium mb-4 text-sm uppercase tracked">Product</h4>
-          <ul class="space-y-2 text-sm">
-            <li><a href="#features" class="footer-link">Features</a></li>
-            <li><a href="#how-it-works" class="footer-link">How It Works</a></li>
-            <li><a href="#pricing" class="footer-link">Pricing</a></li>
-          </ul>
-        </div>
-        <div>
-          <h4 class="font-medium mb-4 text-sm uppercase tracked">Company</h4>
-          <ul class="space-y-2 text-sm">
-            <li><a href="#" class="footer-link">About</a></li>
-            <li><a href="#" class="footer-link">Blog</a></li>
-            <li><a href="#" class="footer-link">Contact</a></li>
-          </ul>
-        </div>
-        <div>
-          <h4 class="font-medium mb-4 text-sm uppercase tracked">Legal</h4>
-          <ul class="space-y-2 text-sm">
-            <li><a href="#" class="footer-link">Privacy</a></li>
-            <li><a href="#" class="footer-link">Terms</a></li>
-            <li><a href="#" class="footer-link">Cookies</a></li>
-          </ul>
-        </div>
+  <footer class="footer">
+    <div class="foot-inner">
+      <div>
+        <a href="#" class="brand" aria-label="Promota home"><span class="brand-name"><span class="ow">Pro</span><span class="works">mota</span></span></a>
+        <p>Intelligent content promotion.</p>
       </div>
-      <div class="pt-8 border-t border-[var(--border)] flex flex-col md:flex-row justify-between items-center gap-4">
-        <p class="text-[var(--muted)] text-sm">2024 Promota. All rights reserved.</p>
-        <div class="flex gap-3">
-          <a href="#" class="footer-link hover:text-[var(--accent)] transition-colors" aria-label="Twitter">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.27 8.502 3.173 7.136-8.647-4.264 1.856 7.031 6.835L24.558 2.5l-8.76 6.08-5.236-4.317-1.007-.761-5.408 4.518-5.405-4.516L3.653 14l5.43 2.295L.75 9.6l3.452-5.05ZM12 5.173l5.726 4.808L12 12l-5.726 4.807-5.727-4.808L12 5.173z"/>
-            </svg>
-          </a>
-          <a href="#" class="footer-link hover:text-[var(--accent)] transition-colors" aria-label="LinkedIn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.447 6.318c-.772 1.173-.297 3.088.515 4.368.812 1.28 2.251 1.306 3.062.307 1.505-1.518 1.897-3.264.865-4.781-.576-1.077-1.589-1.597-2.914-1.597-1.325 0-2.353.577-3.177 1.576-1.515 1.778-1.895 4.208-.518 5.983.27 2.873 2.025 5.618.517 6.05.244.233.505.37.84.37.305 0 .576-.102.797-.31.387-.75.78-1.62 1.027-2.614.515-2.175.467-4.768-.022-6.733zM12 15.63l-3.703 1.958L3.99 9.56l-3.026 5.527L12 .14l8.726 5.376L20.01 9.56l-3.704 1.958L12 15.63z"/>
-            </svg>
-          </a>
-          <a href="#" class="footer-link hover:text-[var(--accent)] transition-colors" aria-label="Instagram">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-            </svg>
-          </a>
-        </div>
+      <div>
+        <h2>Product</h2>
+        <p><a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#pricing">Pricing</a></p>
+      </div>
+      <div>
+        <h2>Company</h2>
+        <p><a href="#">About</a> · <a href="#">Blog</a> · <a href="#">Contact</a></p>
       </div>
     </div>
+    <p class="copy">2024 Promota. All rights reserved. <a href="#">Privacy</a> · <a href="#">Terms</a> · <a href="#">Cookies</a></p>
   </footer>
 
   <!-- Login/Signup Modal -->
-  <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div class="relative bg-[var(--card)] rounded-2xl w-full max-w-md p-8 md:p-12 border border-[var(--border)] transform scale-95 opacity-0 transition-all duration-300" id="modal-content">
-      <button id="close-modal" class="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--fg)] hover:bg-transparent transition-all" aria-label="Close">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-      
-      <div class="mb-6">
-        <h3 class="text-2xl font-bold mb-2" id="modal-title">Login</h3>
-        <p class="text-[var(--muted)] text-sm" id="modal-subtitle">Enter your credentials</p>
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card" id="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button id="close-modal" class="btn ghost" aria-label="Close dialog">Close</button>
+      <div>
+        <h3 id="modal-title">Login</h3>
+        <p id="modal-subtitle">Enter your credentials</p>
       </div>
-
-      <form id="auth-form" class="space-y-4">
+      <form id="auth-form">
         <div>
-          <label class="block text-sm font-medium mb-2" for="email">Email</label>
-          <input type="email" id="email" name="email" required class="rounded-md border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-colors" placeholder="name@domain.com">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required placeholder="name@domain.com">
         </div>
         <div>
-          <label class="block text-sm font-medium mb-2" for="password">Password</label>
-          <input type="password" id="password" name="password" required class="rounded-md border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-colors" placeholder="••••••••">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required placeholder="Password">
         </div>
-        <button type="submit" class="w-full rounded-md font-medium px-6 py-3 bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent-bright)] transition-all">
-          Sign In
-        </button>
+        <button type="submit" class="btn gold">Sign In</button>
       </form>
-
-      <div class="mt-6 text-center">
-        <p class="text-[var(--muted)] text-sm">Don't have an account?</p>
-        <button id="switch-to-signup" class="rounded-md font-medium px-6 py-3 border border-[var(--border)] bg-transparent hover:bg-[var(--accent)] hover:text-[var(--accent)] transition-all">
-          Signup
-        </button>
+      <div>
+        <p>Don't have an account?</p>
+        <button id="switch-to-signup" class="btn ghost">Signup</button>
       </div>
     </div>
   </div>
 
-  <script>
-    // Reduced motion for accessibility
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    function resizeCanvas() {
-      // Canvas removed — no-op
-    }
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    // Modal logic
-    const modal = document.getElementById('modal');
-    const modalContent = document.getElementById('modal-content');
-    const loginBtn = document.getElementById('login-btn');
-    const signupBtn = document.getElementById('signup-btn');
-    const loginCta = document.getElementById('login-cta');
-    const signupCta = document.getElementById('signup-cta');
-    const finalCta = document.getElementById('final-cta');
-    const closeModal = document.getElementById('close-modal');
-    const switchToSignup = document.getElementById('switch-to-signup');
-    const authForm = document.getElementById('auth-form');
-    const modalTitle = document.getElementById('modal-title');
-    const modalSubtitle = document.getElementById('modal-subtitle');
-
-    function openModal(mode) {
-      modal.classList.remove('hidden');
-      setTimeout(() => {
-        modalContent.classList.remove('scale-95', 'opacity-0');
-        modalContent.classList.add('scale-100', 'opacity-100');
-      }, 10);
-      
-      if (mode === 'login') {
-        modalTitle.textContent = 'Login';
-        modalSubtitle.textContent = 'Enter your credentials';
-        authForm.reset();
-      } else {
-        modalTitle.textContent = 'Signup';
-        modalSubtitle.textContent = 'Create your account';
-        authForm.reset();
-      }
-    }
-
-    function closeModalFn() {
-      modalContent.classList.add('scale-95', 'opacity-0');
-      modalContent.classList.remove('scale-100', 'opacity-100');
-      setTimeout(() => {
-        modal.classList.add('hidden');
-      }, 300);
-    }
-
-    // Event listeners
-    loginBtn.addEventListener('click', () => openModal('login'));
-    signupBtn.addEventListener('click', () => openModal('signup'));
-    finalCta.addEventListener('click', () => openModal('login'));
-    closeModal.addEventListener('click', closeModalFn);
-    switchToSignup.addEventListener('click', () => openModal('signup'));
-
-    // Close on overlay click
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModalFn();
-    });
-
-    // Form submission (prevent default for demo)
-    authForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      closeModalFn();
-      // In production, would submit to API
-      alert('Authentication submitted!');
-    });
-
-    // Initial focus trap
-    setTimeout(() => {
-      const firstFocusable = modalContent.querySelector('input, button');
-      if (firstFocusable) firstFocusable.focus();
-    }, 350);
-  </script>
+  <script src="/landing.js"></script>
 </body>
 </html>
