@@ -68,3 +68,85 @@
     closeModalFn();
   });
 })();
+
+/* ---------- landing additions: mobile menu, FAQ accordion, data-auth hooks ---------- */
+(function () {
+  'use strict';
+
+  /* mobile menu toggle */
+  var menuBtn = document.getElementById('menu-btn');
+  var mobileMenu = document.getElementById('mobile-menu');
+  if (menuBtn && mobileMenu) {
+    menuBtn.addEventListener('click', function () {
+      var open = mobileMenu.classList.toggle('open');
+      menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    mobileMenu.addEventListener('click', function (e) {
+      if (e.target && e.target.tagName === 'A') {
+        mobileMenu.classList.remove('open');
+        menuBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  /* FAQ accordion: .q click toggles .a.open + aria-expanded */
+  document.querySelectorAll('.q').forEach(function (q) {
+    q.addEventListener('click', function () {
+      var expanded = q.getAttribute('aria-expanded') === 'true';
+      q.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      var answerId = q.getAttribute('aria-controls');
+      var answer = answerId ? document.getElementById(answerId) : null;
+      if (answer) answer.classList.toggle('open', !expanded);
+      var mark = q.querySelector('span');
+      if (mark) mark.textContent = expanded ? '+' : '−';
+    });
+  });
+
+  /* data-auth buttons open the shared modal without the fixed nav/hero IDs */
+  var modalEl = document.getElementById('modal');
+  if (modalEl) {
+    var openAuth = function (mode) {
+      modalEl.hidden = false;
+      var title = document.getElementById('modal-title');
+      var subtitle = document.getElementById('modal-subtitle');
+      if (title && subtitle) {
+        if (mode === 'login') {
+          title.textContent = 'Login';
+          subtitle.textContent = 'Enter your credentials';
+        } else {
+          title.textContent = 'Signup';
+          subtitle.textContent = 'Create your account';
+        }
+      }
+      var form = document.getElementById('auth-form');
+      if (form) form.reset();
+    };
+    document.querySelectorAll('[data-auth]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        openAuth(el.getAttribute('data-auth') || 'signup');
+      });
+    });
+  }
+
+  /* mobile theme toggle mirrors the nav toggle */
+  var menuTheme = document.getElementById('themeBtnMenu');
+  if (menuTheme) {
+    var isLight = function () {
+      return document.documentElement.getAttribute('data-theme') === 'light';
+    };
+    var syncMenuTheme = function () {
+      menuTheme.setAttribute('aria-pressed', isLight() ? 'true' : 'false');
+    };
+    syncMenuTheme();
+    menuTheme.addEventListener('click', function () {
+      var next = isLight() ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('owoworks-theme', next); } catch (e) { /* storage unavailable */ }
+      var meta = document.getElementById('themeColor');
+      if (meta) meta.setAttribute('content', next === 'light' ? '#f4f7f2' : '#04120b');
+      syncMenuTheme();
+      var navTheme = document.getElementById('themeBtnNav');
+      if (navTheme) navTheme.setAttribute('aria-pressed', next === 'light' ? 'true' : 'false');
+    });
+  }
+})();

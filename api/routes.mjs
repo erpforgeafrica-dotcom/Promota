@@ -14,6 +14,7 @@ import * as session from './session.mjs';
 import * as termii from '../providers/termii.mjs';
 import * as flw from '../providers/flutterwave.mjs';
 import * as data from '../providers/data.mjs';
+import * as admin from './admin.mjs';
 
 const ok = (body, status = 200) => ({ status, body });
 const fail = (message, status = 400, extra = {}) => ({ status, body: { error: message, ...extra } });
@@ -444,7 +445,135 @@ export async function socialTest(req) {
   return ok({ platform, note: `Social test for ${platform} not yet implemented` });
 }
 
-export const routes = {
+/* ------------------------------------------------------------------ blog */
+
+/**
+ * Public content API. No session required: these posts are marketing/help
+ * content, identical for every caller, and hold no user data. They live here
+ * as a module const rather than a table — there is no editorial workflow yet
+ * that would justify a migration, and static content cannot drift from the
+ * schema. To publish a post, add it to this array; its slug becomes
+ * GET /api/blog/<slug> automatically (see the DYNAMIC table below).
+ */
+const BLOG_POSTS = [
+  {
+    slug: 'how-promota-works',
+    title: 'How Promota Works: From Post to Payout',
+    excerpt: 'Promota turns everyday social posts into verified work for Nigerian brands — and turns that work into data bundles and cash for you.',
+    tags: ['basics', 'promoters'],
+    date: '2026-09-01',
+    body: [
+      'Promota is a promotion marketplace. Businesses fund campaigns with money held in escrow; promoters complete real social tasks — reels, tweets, status posts — and get paid in points the moment the work is verified.',
+      'The flow is simple:',
+      '1. A business funds a campaign. The money sits in a double-entry ledger escrow account, not in anyone\'s pocket, and a campaign cannot go live until the full budget is prepaid.',
+      '2. You grab a task from the task board. Every task shows its caption, tracked link, disclosure tag and point value up front — no hidden rates.',
+      '3. You post and submit the proof link. If the poster does not respond within 24 hours, the task auto-approves. That deadline is enforced by the database, not by goodwill.',
+      '4. Points land in your balance. You redeem them for data bundles on MTN, GLO, Airtel or 9mobile — or for cash once you reach the level that unlocks payouts.',
+      'Every money movement is a balanced journal entry, every admin action is written to an append-only audit log, and disputes have a 72-hour resolution SLA. That is the whole machine: work in, verification, points out.',
+    ].join('\n\n'),
+  },
+  {
+    slug: 'earn-with-data-bundles',
+    title: 'Earning Real Data Bundles with Promota',
+    excerpt: 'Points are not vouchers — they redeem into actual mobile data on every major Nigerian network. Here is how the maths works.',
+    tags: ['earning', 'data', 'redemption'],
+    date: '2026-09-08',
+    body: [
+      'On Promota, points are a claim on real value. A data redemption moves points out of your balance immediately and queues a fulfilment job that delivers a genuine bundle to your verified number.',
+      'What you need: a phone-verified account (everyone gets this at signup via OTP) and points. The minimum data redemption is set by the platform in kobo, tuned by the owner from the admin settings — never buried in fine print.',
+      'How points accumulate: each task pays its own point value, set by the campaign. Qualified referrals compound that — when someone you invited completes their first task, you earn a referral award and they start counting toward your level.',
+      'Cash redemptions are a separate, stricter gate: they require a higher KYC tier and age verification, plus a linked bank account, and payouts settle over Flutterwave with a 72-hour hold window. Data is the fast lane; cash is the premium lane.',
+      'Tip: check your /api/me snapshot (in the app, the profile screen) before redeeming. It shows your balance, your level, and exactly how many points and referrals you still need for the next tier.',
+    ].join('\n\n'),
+  },
+  {
+    slug: 'referral-levels-explained',
+    title: 'Referral Levels Explained: Climb and Earn More',
+    excerpt: 'Your level is your leverage. It is computed from points and qualified referrals — and higher levels unlock cash and better standing in competitions.',
+    tags: ['referrals', 'levels'],
+    date: '2026-09-15',
+    body: [
+      'Every promoter starts at level 1. Levels are not bought and cannot be gamed: the level function in the database reads your points balance and your count of QUALIFIED referrals — people who joined with your code and then completed at least one task.',
+      'A referral qualifies on the referee\'s first completed task, not at signup. That single rule is what keeps the programme honest: invite people who actually work, not empty accounts.',
+      'What levels do for you: they gate cash redemption (low levels can redeem data but not bank transfers), they signal trust to the system, and they feed competition scoring during sprints and raffles.',
+      'Your profile screen and /api/referrals endpoint show the live picture: total referrals, qualified referrals, and the exact pointsNeeded and referralsNeeded for the next level. Work the tasks, invite real people, and the ladder climbs itself.',
+    ].join('\n\n'),
+  },
+  {
+    slug: 'campaign-escrow-for-businesses',
+    title: 'Campaign Escrow: Why Businesses Can Trust Promota',
+    excerpt: 'No promoter is paid from thin air. Every naira a brand spends is prepaid into a double-entry escrow account before a single task goes live.',
+    tags: ['business', 'escrow', 'trust'],
+    date: '2026-09-22',
+    body: [
+      'The question every brand asks first is: "where does my money sit until the work is done?" On Promota it sits in escrow — a per-campaign account in a double-entry ledger, enforced by the database itself.',
+      'Before launch, the full campaign budget must be prepaid. A campaign in any funded state can never carry liability (promoter earnings) greater than its escrowed credit. Those are not app-level conventions; they are constraint triggers that fire on every write, for every role, including the platform\'s own operators.',
+      'On top of that sit three automatic guards: a fraud reserve held back from every outcome, a margin floor the platform cannot go below, and an auto-pause that stops a campaign at a chosen percentage of its budget so spend never runs away.',
+      'Settlement is append-only. Corrections are reversal entries, never edits — so the money a brand sees on its statement is exactly what the ledger recorded, byte for byte, forever.',
+    ].join('\n\n'),
+  },
+  {
+    slug: 'security-and-dispute-resolution',
+    title: 'Security and Dispute Resolution on Promota',
+    excerpt: 'Phone-OTP sessions, append-only audit logs, and a 72-hour dispute SLA — what happens when something goes wrong, and who decides.',
+    tags: ['security', 'disputes', 'trust'],
+    date: '2026-09-29',
+    body: [
+      'Promota has no passwords. You prove your phone with a one-time code from Termii, and the session that follows is signed, expiring, and cross-checked against your account state on every single request — so a suspended account stops working immediately, not when its token happens to expire.',
+      'On the money side, postings are immutable: a correction is a reversal entry, and the ledger balances per currency at commit. Admin and money actions are written to an append-only audit log that even the platform owner cannot edit.',
+      'When a task goes wrong, either side can open a dispute. Disputes move through open, under review, and a decision — and a decision without a named reviewer is refused by the database. The SLA is 72 hours; expiry is a first-class outcome, so silence never equals a win.',
+      'Fraud controls are equally blunt: a trust score gates behaviour, a hold threshold parks suspicious tasks for manual review, and a ban threshold removes the account. Every threshold is a setting the owner tunes in the open — not a secret multiplier.',
+    ].join('\n\n'),
+  },
+  {
+    slug: 'getting-started-guide',
+    title: 'Getting Started with Promota: A Step-by-Step Guide',
+    excerpt: 'From first OTP to your first data redemption — the five-minute onboarding path for new promoters.',
+    tags: ['guide', 'onboarding'],
+    date: '2026-10-06',
+    body: [
+      'Step 1 — Verify your phone. Enter your Nigerian number on the signup screen. You receive a 4-digit OTP by SMS; submitting it signs you in and creates your promoter account. There is no password to forget and no email to chase.',
+      'Step 2 — Land on the task board. Every available task shows the exact caption to post, the tracked link, the disclosure tag (keep the #ad — it is a condition of the campaign, not decoration), and the points it pays.',
+      'Step 3 — Post, then submit your proof link within the task\'s window. If the poster goes silent for 24 hours, the task auto-approves and the points are yours. You can follow every status under "my tasks".',
+      'Step 4 — Invite people. Your referral code is in your profile. When an invited friend completes their first task, the referral qualifies: you both start climbing.',
+      'Step 5 — Redeem. Open redemption, pick data, pick your network, and spend points on a real bundle. That is the whole loop — verify, post, get paid, repeat. Welcome to Promota.',
+    ].join('\n\n'),
+  },
+];
+
+const blogIndex = new Map(BLOG_POSTS.map(p => [p.slug, p]));
+const blogSummary = (p) => ({
+  id: p.slug,
+  slug: p.slug,
+  title: p.title,
+  excerpt: p.excerpt,
+  date: p.date,
+  tags: p.tags,
+});
+
+/** GET /api/blog — public list of posts (metadata only). */
+export async function listBlog() {
+  return ok({ posts: BLOG_POSTS.map(blogSummary) });
+}
+
+/** GET /api/blog/:slug — one full post, 404 for an unknown slug. */
+export async function blogPost(_req, params) {
+  const slug = String(params?.slug || '').toLowerCase();
+  const post = blogIndex.get(slug);
+  if (!post) return fail('post not found', 404);
+  return ok({ post: { ...blogSummary(post), body: post.body } });
+}
+
+/* ----------------------------------------------------------------- router */
+
+/**
+ * Exact routes first — the shape server.mjs looks up by "METHOD /path".
+ * Rate limiting, the 404 for unknown /api paths, the 405 on POSTs to static
+ * files and the 400 for non-JSON bodies are all handled in server.mjs; this
+ * table never duplicates them. Every handler here returns { status, body }
+ * with an explicit status, so nothing falls through to a default 200.
+ */
+const exactRoutes = {
   'POST /api/auth/otp/request': requestOtp,
   'POST /api/auth/otp/verify': verifyOtp,
   'GET /api/me': me,
@@ -461,6 +590,59 @@ export const routes = {
   'GET /api/social/status': socialStatus,
   'POST /api/social/connect': socialConnect,
   'POST /api/social/test': socialTest,
+  'GET /api/blog': listBlog,
+  'GET /api/admin/stats': admin.stats,
+  'GET /api/admin/users': admin.listUsers,
+  'GET /api/admin/tasks': admin.listTasksAdmin,
+  'GET /api/admin/campaigns': admin.listCampaignsAdmin,
+  'POST /api/admin/campaigns': admin.createCampaign,
+  'GET /api/admin/settings': admin.getSettings,
+  'POST /api/admin/settings': admin.setSetting,
 };
+
+/**
+ * Path-parameter routes. server.mjs resolves handlers by exact key, so
+ * dynamic segments (/api/blog/:slug, /api/admin/users/:id/suspend, ...) are
+ * matched here in a small pattern table — the same idea as PATTERNS in
+ * server.mjs for /api/tasks/:id/submit, kept on this side because the route
+ * handlers are owned together. The export below is a Proxy over the exact
+ * table plus these patterns, so server.mjs's routes[key] lookup keeps working
+ * unchanged, and api.test.mjs's route-coverage checks keep resolving.
+ */
+const DYNAMIC_ROUTES = [
+  { method: 'GET', re: /^\/api\/blog\/([a-z0-9-]{1,120})\/?$/i, params: ['slug'], fn: blogPost },
+  { method: 'GET', re: /^\/api\/admin\/users\/([0-9a-f-]{36})\/?$/i, params: ['id'], fn: admin.getUser },
+  { method: 'POST', re: /^\/api\/admin\/users\/([0-9a-f-]{36})\/suspend\/?$/i, params: ['id'], fn: admin.suspendUser },
+  { method: 'POST', re: /^\/api\/admin\/users\/([0-9a-f-]{36})\/reinstate\/?$/i, params: ['id'], fn: admin.reinstateUser },
+  { method: 'POST', re: /^\/api\/admin\/tasks\/([0-9a-f-]{36})\/approve\/?$/i, params: ['id'], fn: admin.approveTask },
+  { method: 'POST', re: /^\/api\/admin\/tasks\/([0-9a-f-]{36})\/reject\/?$/i, params: ['id'], fn: admin.rejectTask },
+];
+
+function resolveRoute(key) {
+  if (Object.prototype.hasOwnProperty.call(exactRoutes, key)) return exactRoutes[key];
+  const m = /^([A-Z]+) (.*)$/.exec(key);
+  if (!m) return undefined;
+  const [, method, path] = m;
+  for (const r of DYNAMIC_ROUTES) {
+    if (r.method !== method) continue;
+    const match = r.re.exec(path);
+    if (match) {
+      const params = Object.fromEntries(r.params.map((name, i) => [name, match[i + 1]]));
+      return (req, _ignored, raw) => r.fn(req, params, raw);
+    }
+  }
+  return undefined;
+}
+
+export const routes = new Proxy(exactRoutes, {
+  get(target, prop, receiver) {
+    if (typeof prop !== 'string') return Reflect.get(target, prop, receiver);
+    return resolveRoute(prop);
+  },
+  has(target, prop) {
+    if (typeof prop !== 'string') return Reflect.has(target, prop);
+    return resolveRoute(prop) !== undefined;
+  },
+});
 
 export { requireSession };
