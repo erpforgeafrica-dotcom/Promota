@@ -7,6 +7,9 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Cache busting: force fresh COPY on every build
+ARG BUILD_TIMESTAMP=0
+
 COPY apps/web ./apps/web
 COPY server.mjs ./server.mjs
 # server.mjs imports the API router and outbox worker, which in turn import the
