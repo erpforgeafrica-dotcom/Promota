@@ -28,20 +28,22 @@
  */
 
 export function configured() {
-  return Boolean((process.env.DATA_PROVIDER_API_KEY || '').trim());
+  return Boolean(
+    (process.env.DATA_PROVIDER_API_KEY || '').trim()
+      && (process.env.DATA_PROVIDER_BASE_URL || '').trim()
+  );
 }
 
 /** Why data cannot be delivered right now. Surfaced on /healthz. */
 export function status() {
   return configured()
-    ? { ready: true, provider: process.env.DATA_PROVIDER_NAME || 'unnamed' }
+    ? { ready: true, provider: process.env.DATA_PROVIDER_NAME || 'Kati' }
     : {
         ready: false,
         provider: null,
         reason:
-          'no data aggregator configured. Termii (SMS/OTP) and Flutterwave '
-          + '(cards/transfers) cannot deliver data bundles. Set '
-          + 'DATA_PROVIDER_API_KEY and implement deliver() in providers/data.mjs.',
+          'data aggregator not configured. Set DATA_PROVIDER_API_KEY and '
+          + 'DATA_PROVIDER_BASE_URL env vars to enable Kati data delivery.',
       };
 }
 
@@ -69,16 +71,17 @@ export async function deliver({ network, phone, planCode, reference }) {
   if (!planCode) return { ok: false, retryable: false, error: 'planCode is required' };
 
   const base = process.env.DATA_PROVIDER_BASE_URL;
+  const apiKey = process.env.DATA_PROVIDER_API_KEY;
   try {
-    const res = await fetch(`${base}/orders`, {
+    const res = await fetch(`${base}/v1/quote`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.DATA_PROVIDER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
       },
       // reference is stable per redemption so a retry cannot double-deliver
       body: JSON.stringify({ service: 'data', network, phone, plan: planCode, reference }),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(30000),
     });
     const text = await res.text();
     let json = null;

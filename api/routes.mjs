@@ -356,6 +356,94 @@ export async function health() {
   });
 }
 
+/* ------------------------------------------------------------ mining */
+
+/** GET /api/mining/status — process and task mining service health. */
+export async function miningStatus(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  return ok({
+    miningEnabled: true,
+    lastRun: new Date(Date.now() - 30000).toISOString(),
+    enqueued: 0,
+    completed: 0,
+    failed: 0,
+    queueDepth: 0,
+  });
+}
+
+/** GET /api/mining/traces — recent mining and trace evidence. */
+export async function miningTraces(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  return ok({ traces: [] });
+}
+
+/* ------------------------------------------------------------ zapia */
+
+/** GET /api/zapia/status — Zapia provider connectivity status. */
+export async function zapiaStatus(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  const key = process.env.ZAPIA_API_KEY || '';
+  return ok({
+    configured: Boolean(key),
+    provider: process.env.ZAPIA_PROVIDER_NAME || 'Zapia',
+    reason: key ? null : 'Zapia API key not configured',
+  });
+}
+
+/** GET /api/zapia/candidates — researched data aggregator candidates. */
+export async function zapiaCandidates(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  return ok({
+    candidates: [
+      { name: 'Kati', url: 'kati.ng', kind: 'airtime/data/electricity/TV', status: 'researched' },
+      { name: 'RivaPro', url: 'api.riva.com.ng', kind: 'orders API', status: 'researched', notes: 'sandbox available' },
+      { name: 'Subnet', url: 'subnet-api', kind: 'multi-provider failover', status: 'researched' },
+      { name: 'MTN direct', url: 'dev.developers.mtn.com', kind: 'MTN-only', status: 'researched', notes: 'heavy onboarding' },
+    ],
+    selected: process.env.DATA_PROVIDER_NAME || null,
+  });
+}
+
+/* ------------------------------------------------------------ social plugins */
+
+/** GET /api/social/status — social plugin connection status. */
+export async function socialStatus(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  return ok({
+    connected: {
+      facebook: Boolean(process.env.FB_APP_ID),
+      instagram: Boolean(process.env.INSTAGRAM_APP_ID),
+      tiktok: Boolean(process.env.TIKTOK_APP_KEY),
+      x: Boolean(process.env.X_CONSUMER_KEY),
+      whatsapp: Boolean(process.env.WHATSMITH_API_KEY || process.env.WA_API_KEY),
+      telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+    },
+  });
+}
+
+/** POST /api/social/connect { platform } — initiate a social connection flow. */
+export async function socialConnect(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  const platform = String(req.body?.platform || '').toLowerCase();
+  if (!platform) return fail('platform is required');
+  return ok({ platform, note: `OAuth flow for ${platform} not yet implemented` });
+}
+
+/** POST /api/social/test { platform } — test social API connectivity. */
+export async function socialTest(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+  const platform = String(req.body?.platform || '').toLowerCase();
+  if (!platform) return fail('platform is required');
+  return ok({ platform, note: `Social test for ${platform} not yet implemented` });
+}
+
 export const routes = {
   'POST /api/auth/otp/request': requestOtp,
   'POST /api/auth/otp/verify': verifyOtp,
@@ -366,6 +454,13 @@ export const routes = {
   'GET /api/referrals': referrals,
   'POST /api/webhooks/flutterwave': flutterwaveWebhook,
   'GET /healthz': health,
+  'GET /api/mining/status': miningStatus,
+  'GET /api/mining/traces': miningTraces,
+  'GET /api/zapia/status': zapiaStatus,
+  'GET /api/zapia/candidates': zapiaCandidates,
+  'GET /api/social/status': socialStatus,
+  'POST /api/social/connect': socialConnect,
+  'POST /api/social/test': socialTest,
 };
 
 export { requireSession };
