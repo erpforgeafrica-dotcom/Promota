@@ -21,6 +21,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { join, dirname, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { routes, submitTask } from './api/routes.mjs';
+import { ready as checkReady } from './api/readyz.mjs';
 import * as worker from './api/worker.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -75,6 +76,44 @@ function rateLimited(ip) {
   if (rateBuckets.size > 5000) {
     for (const [k, v] of rateBuckets) {
       if (!v.some(t => t > cut)) rateBuckets.delete(k);
+    }
+  }
+  return 0;
+}
+
+/* ------------------------------------- tighter budgets for hot poll paths */
+/**
+ * Per-path override on top of rateLimited: status/poll endpoints are cheap to
+ * call and expensive to fan out, so dashboards that poll them get a tighter
+ * budget (requests/min per IP). Paths absent from this map keep the default
+ * RATE_MAX behaviour unchanged.
+ */
+const POLL_BUDGETS = {
+  '/api/mining/status': 20,
+  '/api/mining/traces': 20,
+  '/api/zapia/status': 20,
+  '/api/zapia/candidates': 20,
+};
+const pollBuckets = new Map();
+
+/** Tighter sliding window for hot poll paths. Unknown paths return 0 (no extra limit). */
+function pollLimited(ip, path) {
+  const max = POLL_BUDGETS[path];
+  if (!max) return 0;
+  const now = Date.now();
+  const cut = now - RATE_WINDOW_MS;
+  const key = `${ip} ${path}`;
+  const hits = (pollBuckets.get(key) || []).filter(t => t > cut);
+  if (hits.length >= max) {
+    pollBuckets.set(key, hits);
+    return Math.ceil((hits[0] + RATE_WINDOW_MS - now) / 1000);
+  }
+  hits.push(now);
+  pollBuckets.set(key, hits);
+  // opportunistic cleanup so the map cannot grow without bound
+  if (pollBuckets.size > 5000) {
+    for (const [k, v] of pollBuckets) {
+      if (!v.some(t => t > cut)) pollBuckets.delete(k);
     }
   }
   return 0;
@@ -199,12 +238,17 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
     // the API is throttled harder than static reads
-    if (url.pathname.startsWith('/api/') || url.pathname === '/healthz') {
-      const retry = rateLimited(clientIp(req));
+    if (url.pathname.startsWith('/api/') || url.pathname === '/healthz' || url.pathname === '/readyz') {
+      const ip = clientIp(req);
+      const retry = rateLimited(ip) || pollLimited(ip, url.pathname);
       if (retry) {
         return json(res, 429, { error: 'slow down' }, headOnly);
       }
       res.setHeader('X-RateLimit-Remaining', String(RATE_MAX));
+      if (url.pathname === '/readyz' && (req.method === 'GET' || req.method === 'HEAD')) {
+        const result = await checkReady();
+        return json(res, result.ready ? 200 : 503, result, headOnly);
+      }
       return handleApi(req, res, url);
     }
 
