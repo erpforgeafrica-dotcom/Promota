@@ -17,6 +17,9 @@ COPY server.mjs ./server.mjs
 # boot with ERR_MODULE_NOT_FOUND and never becomes healthy.
 COPY api ./api
 COPY providers ./providers
+# readyz compares the repo migration count against the live DB ledger, so the
+# migration files (schema only, no secrets) must ship in the image.
+COPY db/migrations ./db/migrations
 
 USER node
 EXPOSE 8080

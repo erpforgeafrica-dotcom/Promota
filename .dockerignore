@@ -2,7 +2,8 @@
 .git
 .github
 node_modules
-db
+db/*
+!db/migrations/
 scripts
 PROOF
 tmp

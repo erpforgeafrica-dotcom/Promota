@@ -34,11 +34,20 @@ const reasonOf = (e) => String(e?.message || e || 'unknown').slice(0, 200);
  * { ok: false, reason } check, not an exception.
  */
 export async function ready() {
-  const repo = repoMigrations();
+  let repo = { count: 0, max: 0 };
+  let repoError = null;
+  try {
+    repo = repoMigrations();
+  } catch (e) {
+    // db/migrations is absent from minimal images: report not-ready, never throw.
+    repoError = reasonOf(e);
+  }
   const checks = {
     supabase: { ok: false },
     flags: { ok: false },
-    migrations: { ok: false, repo: repo.count },
+    migrations: repoError
+      ? { ok: false, repo: 0, reason: `repo migrations unreadable: ${repoError}` }
+      : { ok: false, repo: repo.count },
   };
 
   if (!sb.configured()) {
