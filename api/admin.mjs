@@ -682,3 +682,43 @@ export async function setSetting(req) {
   await audit(auth, 'settings.write', 'setting', key, { before, after: value });
   return ok({ updated: true, key, value });
 }
+
+/* -------------------------------------------------------------- audit trail */
+
+/**
+ * GET /api/admin/audit?limit=&offset= — read-only reconciliation feed over
+ * the audit_reconciliation view (db/migrations/0011_audit_view.sql), which
+ * slices the append-only audit_log by target, actor, action and date.
+ * The log itself stays append-only: even the owner cannot edit it, so this
+ * endpoint only ever reads. Paginated, max 100 rows per page.
+ */
+export async function listAudit(req) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support', 'finance']);
+  if (gate.error) return gate.error;
+
+  const sp = query(req);
+  const limit = intParam(sp, 'limit', 50, 1, 100);
+  const offset = intParam(sp, 'offset', 0, 0, 100000);
+
+  const qs = 'select=id,created_at,action_date,actor_id,actor_role,action,'
+    + 'target_type,target_id,before_state,after_state'
+    + `&order=created_at.desc&limit=${limit}&offset=${offset}`;
+
+  const rows = await sb.select('audit_reconciliation', qs);
+  return ok({
+    audit: rows.map(a => ({
+      id: a.id,
+      createdAt: a.created_at,
+      actionDate: a.action_date,
+      actorId: a.actor_id,
+      actorRole: a.actor_role,
+      action: a.action,
+      targetType: a.target_type,
+      targetId: a.target_id,
+      beforeState: a.before_state ?? null,
+      afterState: a.after_state ?? null,
+    })),
+    limit,
+    offset,
+  });
+}

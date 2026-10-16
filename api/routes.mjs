@@ -15,6 +15,7 @@ import * as termii from '../providers/termii.mjs';
 import * as flw from '../providers/flutterwave.mjs';
 import * as data from '../providers/data.mjs';
 import * as admin from './admin.mjs';
+import * as promoter from './promoter.mjs';
 
 const ok = (body, status = 200) => ({ status, body });
 const fail = (message, status = 400, extra = {}) => ({ status, body: { error: message, ...extra } });
@@ -598,6 +599,10 @@ const exactRoutes = {
   'POST /api/admin/campaigns': admin.createCampaign,
   'GET /api/admin/settings': admin.getSettings,
   'POST /api/admin/settings': admin.setSetting,
+  'GET /api/admin/audit': admin.listAudit,
+  'GET /api/v1/promoter/earnings': promoter.earnings,
+  'GET /api/v1/promoter/referrals': promoter.referrals,
+  'GET /api/v1/promoter/payouts': promoter.payouts,
 };
 
 /**

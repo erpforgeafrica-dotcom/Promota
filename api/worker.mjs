@@ -185,9 +185,85 @@ export async function sweep() {
 }
 
 let timer = null;
+
+/* ------------------------------------------------------- Kati lazy init */
+/**
+ * Kati (the data-bundle aggregator) is optional at boot: the worker must stay
+ * green when Kati is down or unconfigured. initKati() probes the provider
+ * status plus the kati_enabled flag row in the background, retries transient
+ * failures with backoff, records the outcome on `kati` (and best-effort on
+ * the flag row's payload), and NEVER throws — boot never waits for it and a
+ * dead Kati never stops the outbox loop.
+ */
+export const kati = {
+  state: 'unknown', // unknown | ready | down
+  reason: null,
+  attempts: 0,
+  lastChecked: null,
+};
+
+const KATI_INIT_RETRIES = Number(process.env.KATI_INIT_RETRIES || 5);
+const KATI_INIT_BASE_DELAY_MS = Number(process.env.KATI_INIT_BASE_DELAY_MS || 1000);
+
+/** Best-effort read of the kati_enabled flag row. Null when the flags table or DB is unreachable. */
+async function readKatiFlag() {
+  try {
+    const rows = await sb.select('flags', 'key=eq.kati_enabled&select=key,enabled,payload&limit=1');
+    return rows?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function initKati() {
+  let lastError = null;
+  for (let attempt = 1; attempt <= KATI_INIT_RETRIES; attempt++) {
+    kati.attempts = attempt;
+    try {
+      const [st, flag] = await Promise.all([
+        Promise.resolve().then(() => data.status()),
+        readKatiFlag(),
+      ]);
+      if (!st.ready) {
+        kati.state = 'down';
+        kati.reason = String(st.reason || 'data provider not configured').slice(0, 200);
+      } else if (flag && flag.enabled === false) {
+        kati.state = 'down';
+        kati.reason = 'kati_enabled flag is off';
+      } else {
+        kati.state = 'ready';
+        kati.reason = null;
+      }
+      kati.lastChecked = new Date().toISOString();
+      // Best-effort status writeback onto the flag row; a missing table or a
+      // denied write must never fail init.
+      if (flag) {
+        try {
+          await sb.update('flags', 'key=eq.kati_enabled', {
+            payload: { ...(flag.payload || {}), state: kati.state, lastChecked: kati.lastChecked },
+          });
+        } catch { /* best-effort only */ }
+      }
+      return { ...kati };
+    } catch (e) {
+      lastError = String(e?.message || e).slice(0, 200);
+    }
+    if (attempt < KATI_INIT_RETRIES) {
+      const delay = Math.min(KATI_INIT_BASE_DELAY_MS * 2 ** (attempt - 1), 15000);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  kati.state = 'down';
+  kati.reason = lastError || 'kati init failed';
+  kati.lastChecked = new Date().toISOString();
+  return { ...kati };
+}
+
 export function start() {
   if (timer) return;
   log(`starting (tick ${TICK_MS}ms)`);
+  // Kati init runs in the background: boot and the outbox loop never wait for it.
+  initKati().catch(() => {});
   const run = async () => {
     try { await sweep(); } catch (e) { log('sweep error:', String(e.message).slice(0, 160)); }
     try { await tick(); } catch (e) { log('tick error:', String(e.message).slice(0, 160)); }
