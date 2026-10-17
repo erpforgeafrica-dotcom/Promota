@@ -45,6 +45,10 @@
         <button class="tab" role="tab" aria-checked="false" data-pane="users" type="button">Users</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="review" type="button">Task review</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="campaigns" type="button">Campaigns</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="owners" type="button">Owners</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="kyc" type="button">KYC</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="mining" type="button">Mining</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="plugins" type="button">Plugins</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="settings" type="button">Settings</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="audit" type="button">Audit trail</button>
       </div>
@@ -112,12 +116,13 @@
         </form>
         <div id="review-status" class="form-status" role="status"></div>
         <div class="table-wrap"><table id="review-table"><thead><tr><th>Task</th><th>State</th><th>Proof</th><th>Submitted</th><th>Actions</th></tr></thead><tbody id="review-body"></tbody></table></div>
+        <div id="proof-detail" class="panel" hidden></div>
       </section>
 
       <!-- Campaigns -->
       <section id="pane-campaigns" class="pane" role="tabpanel" hidden>
         <div id="campaigns-status" class="form-status" role="status"></div>
-        <div class="table-wrap"><table id="campaigns-table"><thead><tr><th>Title</th><th>Platform</th><th>Objective</th><th>State</th><th>Budget</th><th>Spent</th></tr></thead><tbody id="campaigns-body"></tbody></table></div>
+        <div class="table-wrap"><table id="campaigns-table"><thead><tr><th>Title</th><th>Platform</th><th>Objective</th><th>State</th><th>Budget</th><th>Spent</th><th>Actions</th></tr></thead><tbody id="campaigns-body"></tbody></table></div>
         <div class="panel">
           <h3>Create a campaign (draft)</h3>
           <form id="campaign-form">
@@ -153,6 +158,35 @@
           </form>
           <p class="fine">A campaign is created in draft. Going live requires escrow funding enforced by the database.</p>
         </div>
+      </section>
+
+      <!-- Campaign owners -->
+      <section id="pane-owners" class="pane" role="tabpanel" hidden>
+        <p class="fine">Businesses and individuals request campaign-owner verification from their dashboard; confirming here unlocks self-serve campaign creation.</p>
+        <div id="owners-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table id="owners-table"><thead><tr><th>Owner</th><th>Kind</th><th>Contact</th><th>State</th><th>Submitted</th><th>Actions</th></tr></thead><tbody id="owners-body"></tbody></table></div>
+      </section>
+
+      <!-- KYC -->
+      <section id="pane-kyc" class="pane" role="tabpanel" hidden>
+        <p class="fine">Payout KYC: bank details (t1) and identity fingerprints (t2). NIN/BVN values arrive as HMAC fingerprints — the raw numbers are never stored.</p>
+        <div id="kyc-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table id="kyc-table"><thead><tr><th>Promoter</th><th>Tier</th><th>Bank</th><th>18+</th><th>Identity</th><th>Actions</th></tr></thead><tbody id="kyc-body"></tbody></table></div>
+      </section>
+
+      <!-- Mining -->
+      <section id="pane-mining" class="pane" role="tabpanel" hidden>
+        <div id="mining-status" class="form-status" role="status"></div>
+        <div class="stat-grid" id="mining-stats"></div>
+        <div class="table-wrap"><table id="mining-table"><thead><tr><th>Stage</th><th>Median hours</th></tr></thead><tbody id="mining-body"></tbody></table></div>
+        <div class="table-wrap"><table id="traces-table"><thead><tr><th>Task</th><th>Action</th><th>State</th><th>Path</th></tr></thead><tbody id="traces-body"></tbody></table></div>
+      </section>
+
+      <!-- Plugins -->
+      <section id="pane-plugins" class="pane" role="tabpanel" hidden>
+        <div id="plugins-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table id="plugins-table"><thead><tr><th>Plugin</th><th>Status</th><th>Note</th></tr></thead><tbody id="plugins-body"></tbody></table></div>
+        <div id="socials-wrap"></div>
       </section>
 
       <!-- Settings -->

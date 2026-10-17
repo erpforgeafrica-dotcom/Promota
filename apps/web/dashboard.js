@@ -107,11 +107,22 @@
     }
   }
 
+  var ACTION_LABEL = {
+    post: 'Post', like: 'Like', comment: 'Comment', follow: 'Follow', subscribe: 'Subscribe',
+    repost: 'Repost', share: 'Share', view: 'Watch', join_channel: 'Join the channel', review: 'Review',
+  };
+
   function taskCard(t, actionsHtml) {
+    var views = t.viewsRequired ? ' · ' + Number(t.viewsRequired).toLocaleString('en-NG') + '+ views earns a bonus' : '';
+    var asset = (t.campaignAssets && t.campaignAssets[0])
+      ? '<p>Creative: <a href="' + esc(t.campaignAssets[0]) + '" target="_blank" rel="noopener noreferrer">open asset</a></p>'
+      : '';
     return '<article class="panel task-card">' +
       '<div class="task-head"><h3>' + esc(t.caption || 'Untitled task') + '</h3>' + badge(t.state) + '</div>' +
       '<p>' + (t.trackedLink ? 'Tracked link: <a href="' + esc(t.trackedLink) + '" target="_blank" rel="noopener noreferrer">' + esc(t.trackedLink) + '</a>' : '') + '</p>' +
-      '<p class="fine">Disclosure: ' + esc(t.disclosureTag || '#ad') + ' · Worth ' + (t.points != null ? esc(String(t.points)) + ' points' : 'a reward') +
+      asset +
+      '<p class="fine">Action: ' + esc(ACTION_LABEL[t.actionType] || (t.actionType || 'Post')) + views +
+      ' · Disclosure: ' + esc(t.disclosureTag || '#ad') + ' · Worth ' + (t.points != null ? esc(String(t.points)) + ' points' : 'a reward') +
       (t.rewardMinor ? ' (' + naira(t.rewardMinor) + ')' : '') + '</p>' +
       (actionsHtml || '') +
       '</article>';
@@ -126,7 +137,28 @@
       if (box) box.textContent = '';
       return;
     }
-    el.innerHTML = tasks.map(function (t) { return taskCard(t); }).join('');
+    el.innerHTML = tasks.map(function (t) {
+      return taskCard(t, '<form class="claim-form" data-task="' + esc(String(t.id)) + '">' +
+        '<button type="submit" class="btn">Claim task</button></form>');
+    }).join('');
+    el.querySelectorAll('.claim-form').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var id = form.getAttribute('data-task');
+        var btn = form.querySelector('button');
+        if (btn) btn.disabled = true;
+        Auth.api('/api/tasks/' + encodeURIComponent(id) + '/claim', { method: 'POST' }).then(function (r) {
+          if (r.status === 200) {
+            if (box) { box.textContent = 'Task claimed — finish it under "my tasks".'; box.className = 'form-status ok'; }
+            loadTasks();
+            loadMine();
+            return;
+          }
+          if (btn) btn.disabled = false;
+          if (box) { box.textContent = (r.body && r.body.error) || 'Could not claim the task.'; box.className = 'form-status error'; }
+        });
+      });
+    });
     if (box) box.textContent = '';
   }
 
@@ -144,6 +176,13 @@
       if (t.state === 'assigned') {
         actions = '<form class="proof-form" data-task="' + esc(String(t.id)) + '">' +
           '<input type="url" name="proofUrl" required placeholder="https:// proof link of your post">' +
+          '<select name="platform">' +
+          '<option value="whatsapp">WhatsApp</option><option value="telegram">Telegram</option>' +
+          '<option value="x">X / Twitter</option><option value="instagram">Instagram</option>' +
+          '<option value="tiktok">TikTok</option><option value="facebook">Facebook</option>' +
+          '<option value="youtube">YouTube</option><option value="other">Other</option></select>' +
+          '<input type="number" name="views" min="0" step="1" placeholder="views (optional)">' +
+          '<input type="url" name="screenshotUrl" placeholder="https:// screenshot link (optional)">' +
           '<button type="submit" class="btn primary">Submit proof</button></form>';
       } else if (t.state === 'submitted') {
         actions = '<p class="fine">Waiting for review' + (t.autoApproveAt ? ' — auto-approves after ' + when(t.autoApproveAt) : '') + '.</p>';
@@ -165,14 +204,22 @@
           if (b) { b.textContent = 'Paste the full link of your post (https://…).'; b.className = 'form-status error'; }
           return;
         }
+        var body = { proofUrl: url };
+        var platform = form.querySelector('select[name="platform"]');
+        if (platform) body.platform = platform.value;
+        var viewsEl = form.querySelector('input[name="views"]');
+        if (viewsEl && viewsEl.value !== '') body.views = Number(viewsEl.value);
+        var shot = form.querySelector('input[name="screenshotUrl"]');
+        if (shot && shot.value.trim()) body.screenshotUrl = shot.value.trim();
         var id = form.getAttribute('data-task');
         var btn = form.querySelector('button');
         if (btn) btn.disabled = true;
-        Auth.api('/api/tasks/' + encodeURIComponent(id) + '/submit', { method: 'POST', body: { proofUrl: url } })
+        Auth.api('/api/tasks/' + encodeURIComponent(id) + '/submit', { method: 'POST', body: body })
           .then(function (r) {
             loadMine();
             var b = document.getElementById('mine-status');
-            if (r.status === 200 && b) { b.textContent = 'Proof submitted. Points land after verification.'; b.className = 'form-status ok'; return; }
+            var okMsg = r.status === 200 && b;
+            if (okMsg) { b.textContent = (r.body && r.body.nextStep) || 'Proof submitted. Points land after verification.'; b.className = 'form-status ok'; return; }
             if (b) { b.textContent = (r.body && r.body.error) || 'Could not submit the proof.'; b.className = 'form-status error'; }
             if (btn) btn.disabled = false;
           });
@@ -210,8 +257,12 @@
   function renderReferrals(data) {
     var box = document.getElementById('referrals-status');
     if (box) {
+      var eco = [];
+      if (data.awardPerReferral != null) eco.push(String(data.awardPerReferral) + ' points land for you on every qualified referral');
+      if (data.downlineBonusBp != null) eco.push('a ' + (data.downlineBonusBp / 100) + '% slice of every task your referrals complete flows to you too');
       box.textContent = String(data.total) + ' referral' + (data.total === 1 ? '' : 's') + ', ' +
-        String(data.qualified) + ' qualified. A referral qualifies when your invitee completes their first task.';
+        String(data.qualified) + ' qualified.' + (eco.length ? ' ' + eco.join(', and ') + '.' : '') +
+        ' A referral qualifies when your invitee completes their first task — the faster they work, the closer you are to cash.';
       box.className = 'form-status';
     }
     fillTable('referrals-body', data.referrals || [], function (r) {
@@ -274,6 +325,16 @@
     });
   }
 
+  function loadTasks() {
+    return Auth.api('/api/tasks').then(function (r) {
+      if (r.status === 200 && r.body) renderTasks('tasks-status', 'tasks-list', r.body.tasks || []);
+      else {
+        var b = document.getElementById('tasks-status');
+        if (b) { b.textContent = (r.body && r.body.error) || 'Could not load tasks.'; b.className = 'form-status error'; }
+      }
+    });
+  }
+
   function loadMoney() {
     return Promise.all([
       Auth.api('/api/v1/promoter/earnings'),
@@ -327,13 +388,7 @@
     if (!me) return;
     redeemPaneBind();
     return Promise.all([
-      Auth.api('/api/tasks').then(function (r) {
-        if (r.status === 200 && r.body) renderTasks('tasks-status', 'tasks-list', r.body.tasks || []);
-        else {
-          var b = document.getElementById('tasks-status');
-          if (b) { b.textContent = (r.body && r.body.error) || 'Could not load tasks.'; b.className = 'form-status error'; }
-        }
-      }),
+      loadTasks(),
       loadMine(),
       loadMoney(),
       loadReferrals()

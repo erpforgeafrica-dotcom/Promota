@@ -16,6 +16,10 @@
  */
 import * as session from './session.mjs';
 import * as sb from './supabase.mjs';
+import * as termii from '../providers/termii.mjs';
+import * as data from '../providers/data.mjs';
+import * as flw from '../providers/flutterwave.mjs';
+import * as social from './social.mjs';
 
 const AUTH_URL = (process.env.SUPABASE_URL || '').trim();
 const SERVICE_KEY = (process.env.SUPABASE_SECRET_KEY
@@ -449,12 +453,28 @@ export async function approveTask(req, params) {
     return fail(`a task in state "${task.state}" cannot be approved`, 409);
   }
 
+  // The reviewer may correct the proof's view count on the evidence row.
+  const viewsIn = req.body?.views;
+  let views = null;
+  if (viewsIn != null && viewsIn !== '') {
+    views = Number(viewsIn);
+    if (!Number.isInteger(views) || views < 0 || views > 2_000_000_000) {
+      return fail('views must be a non-negative whole number');
+    }
+  }
+
   let updated;
   try {
     updated = await sb.update(
       'tasks',
       `id=eq.${id}&state=in.(submitted,checking,held)`,
-      { state: 'approved', reviewed_by: auth.sub, updated_at: new Date().toISOString() }
+      {
+        state: 'approved',
+        reviewed_by: auth.sub,
+        verdict: 'approved',
+        verdict_source: 'admin_review',
+        updated_at: new Date().toISOString(),
+      }
     );
   } catch (e) {
     if (/illegal task transition/i.test(String(e.message))) {
@@ -464,8 +484,29 @@ export async function approveTask(req, params) {
   }
   if (!updated?.length) return fail('the task changed state before we could save', 409);
 
-  await audit(auth, 'task.approve', 'task', id, { state: 'approved' });
+  if (views != null) {
+    await sb.update('task_proofs', `task_id=eq.${id}`, { views })
+      .catch(() => { /* no proof row (legacy task) â€” nothing to correct */ });
+  }
+
+  await audit(auth, 'task.approve', 'task', id, { state: 'approved', views });
+
+  // Points move through the outbox so a crash mid-award is retried, not
+  // lost. The worker awards through the SAME idempotent SQL path the
+  // auto-approve sweeper uses, referral slice and views bonus included.
+  try { await sb.insert('outbox', { topic: 'task.approved', payload: { task_id: id } }); }
+  catch (e) { failingOutbox(auth, id, e); }
+
   return ok({ approved: true, taskId: id, state: 'approved' });
+}
+
+/** Best-effort note when the award outbox insert fails; never blocks approval. */
+let outboxWarned = false;
+function failingOutbox(_auth, taskId, e) {
+  if (!outboxWarned) {
+    console.log(`[admin] outbox insert failed for task ${taskId}: ${String(e.message).slice(0, 160)}`);
+    outboxWarned = true;
+  }
 }
 
 /** POST /api/admin/tasks/:id/reject  { reason } */
@@ -494,6 +535,8 @@ export async function rejectTask(req, params) {
         state: 'rejected',
         reviewed_by: auth.sub,
         rejection_reason: reason,
+        verdict: 'rejected',
+        verdict_source: 'admin_review',
         updated_at: new Date().toISOString(),
       }
     );
@@ -720,5 +763,281 @@ export async function listAudit(req) {
     })),
     limit,
     offset,
+  });
+}
+
+/* ---------------------------------------- self-serve campaign + owners */
+
+const OWNER_STATES = ['pending', 'verified', 'rejected'];
+const mapOwnerRow = (o) => ({
+  id: o.id,
+  profileId: o.profile_id,
+  kind: o.kind,
+  displayName: o.display_name,
+  businessName: o.business_name,
+  businessReg: o.business_reg,
+  website: o.website,
+  contact: o.contact,
+  verificationState: o.verification_state,
+  verificationNote: o.verification_note,
+  verifiedAt: o.verified_at,
+  submittedAt: o.updated_at ?? o.created_at,
+});
+
+/** GET /api/admin/campaign/owners?state= — owner verification queue. */
+export async function listCampaignOwners(req) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+
+  const sp = query(req);
+  const state = OWNER_STATES.includes(sp.get('state')) ? sp.get('state') : null;
+  const rows = await sb.select('campaign_owners', 'select=*'
+    + (state ? `&verification_state=eq.${state}` : '')
+    + '&order=updated_at.desc&limit=100');
+  return ok({ owners: rows.map(mapOwnerRow) });
+}
+
+/**
+ * POST /api/admin/campaign/owners/:id/verify  { verdict: 'verified'|'rejected', note? }
+ * The gate every self-serve campaign stands behind.
+ */
+export async function verifyCampaignOwner(req, params) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+  const auth = gate.auth;
+
+  const id = String(params?.id || '');
+  if (!UUID_RE.test(id)) return fail('a campaign owner id is required');
+
+  const verdict = String(req.body?.verdict || '').trim();
+  if (!['verified', 'rejected'].includes(verdict)) return fail("verdict must be 'verified' or 'rejected'");
+  const note = req.body?.note == null ? null : String(req.body.note).trim().slice(0, 300);
+
+  const [owner] = await sb.select('campaign_owners', `id=eq.${id}&select=id,verification_state`);
+  if (!owner) return fail('campaign owner not found', 404);
+  if (owner.verification_state === 'verified' && verdict === 'verified') {
+    return ok({ owner, alreadyVerified: true });
+  }
+
+  const updated = await sb.update(
+    'campaign_owners',
+    `id=eq.${id}&verification_state=neq.verified`,
+    {
+      verification_state: verdict,
+      verification_note: note,
+      verified_at: verdict === 'verified' ? new Date().toISOString() : null,
+      reviewer_id: auth.sub,
+      updated_at: new Date().toISOString(),
+    }
+  );
+  if (!updated?.length) return fail('the owner changed state before we could save', 409);
+
+  await audit(auth, 'campaign.owner_verify', 'campaign_owner', id, { state: verdict });
+  return ok({ owner: mapOwnerRow(updated[0]) });
+}
+
+/**
+ * POST /api/admin/campaigns/:id/fund  { amountMinor, note? }
+ * Top-up or initial escrow double-entry prepayment. The SQL function is
+ * idempotent per (campaign, note) and refuses campaign states it cannot
+ * escrow for.
+ */
+export async function fundCampaign(req, params) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'finance']);
+  if (gate.error) return gate.error;
+  const auth = gate.auth;
+
+  const id = String(params?.id || '');
+  if (!UUID_RE.test(id)) return fail('a campaign id is required');
+  const amount = Number(req.body?.amountMinor);
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return fail('amountMinor must be a positive whole number of kobo');
+  }
+  const note = req.body?.note == null ? null : String(req.body.note).trim().slice(0, 200);
+
+  let escrow;
+  try {
+    escrow = await sb.rpc('fund_campaign_escrow', {
+      p_campaign: id,
+      p_amount_minor: amount,
+      p_created_by: auth.sub,
+      p_note: note,
+    });
+  } catch (e) {
+    return fail(`escrow funding refused: ${String(e.message).slice(0, 200)}`, 409);
+  }
+
+  await audit(auth, 'campaign.fund', 'campaign', id, { escrowMinor: amount });
+  return ok({ funded: true, campaignId: id, escrowMinor: Number(escrow ?? amount) });
+}
+
+/**
+ * POST /api/admin/campaigns/:id/confirm — review ? live.
+ * The database still guards the launch: an unfunded campaign cannot go live
+ * (409 with the SQL's own message surfaces in escrow failure).
+ */
+export async function confirmCampaign(req, params) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+  const auth = gate.auth;
+
+  const id = String(params?.id || '');
+  if (!UUID_RE.test(id)) return fail('a campaign id is required');
+
+  const [campaign] = await sb.select('campaigns', `id=eq.${id}&select=id,owner_id,state`);
+  if (!campaign) return fail('campaign not found', 404);
+  if (!['draft', 'review'].includes(campaign.state)) {
+    return fail(`a campaign in state "${campaign.state}" cannot be confirmed`, 409);
+  }
+
+  // A third-party owner's campaign still needs an APPROVED owner row; the
+  // admin's own sandbox campaigns skip that check.
+  if (campaign.owner_id !== auth.sub) {
+    const [ownerRow] = await sb.select(
+      'campaign_owners',
+      `profile_id=eq.${campaign.owner_id}&select=verification_state`
+    );
+    if (ownerRow?.verification_state === 'rejected') {
+      return fail('the campaign owner is not approved', 409);
+    }
+  }
+
+  let updated;
+  try {
+    updated = await sb.update(
+      'campaigns',
+      `id=eq.${id}&state=in.(draft,review)`,
+      { state: 'live', updated_at: new Date().toISOString() }
+    );
+  } catch (e) {
+    const m = String(e.message);
+    if (/escrow|cannot go live|funded|unfunded/i.test(m)) {
+      return fail(`launch refused: ${m.replace(/^.*?(?=campaign|escrow)/, '').slice(0, 180)}`, 409);
+    }
+    throw e;
+  }
+  if (!updated?.length) return fail('the campaign changed state before we could save', 409);
+
+  await audit(auth, 'campaign.confirm', 'campaign', id, { state: 'live' });
+  return ok({ confirmed: true, campaignId: id, state: 'live' });
+}
+
+/* ------------------------------------------------------------- kyc tiers */
+
+/** GET /api/admin/kyc — payout-KYC submission queue (no raw identifiers). */
+export async function listKycProfiles(req) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+
+  const rows = await sb.select('profiles',
+    'legal_name=not.is.null'
+    + '&select=id,display_name,phone_e164,kyc_tier,legal_name,bank_name,bank_last4,'
+    + 'identity_ref,age_verified_at,updated_at'
+    + '&order=updated_at.desc&limit=100');
+
+  return ok({
+    kyc: rows.map(r => ({
+      id: r.id,
+      displayName: r.display_name,
+      phone: r.phone_e164,
+      kycTier: r.kyc_tier,
+      legalName: r.legal_name,
+      bankName: r.bank_name,
+      bankLast4: r.bank_last4,
+      ageVerified: Boolean(r.age_verified_at),
+      identitySubmitted: Boolean(r.identity_ref),
+      updatedAt: r.updated_at,
+    })),
+  });
+}
+
+/**
+ * POST /api/admin/kyc/:id/verify  { tier: 't1'|'t2' }
+ * t2 requires the identity step to have run (HMAC fingerprint exists); the
+ * raw number never existed in our storage to begin with.
+ */
+export async function verifyKycTier(req, params) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+  const auth = gate.auth;
+
+  const id = String(params?.id || '');
+  if (!UUID_RE.test(id)) return fail('a profile id is required');
+
+  const tier = String(req.body?.tier || '').trim();
+  if (!['t1', 't2'].includes(tier)) return fail("tier must be 't1' or 't2'");
+
+  const [profile] = await sb.select('profiles', `id=eq.${id}&select=id,kyc_tier,identity_ref`);
+  if (!profile) return fail('profile not found', 404);
+  if (tier === 't2' && !profile.identity_ref) {
+    return fail('identity KYC step has not completed for this promoter', 409);
+  }
+
+  await sb.update('profiles', `id=eq.${id}`, {
+    kyc_tier: tier,
+    updated_at: new Date().toISOString(),
+  });
+  await audit(auth, 'kyc.tier', 'profile', id, { kycTier: tier });
+  return ok({ verified: true, profileId: id, kycTier: tier });
+}
+
+/* ------------------------------------------------------------ evidence */
+
+/** GET /api/admin/tasks/:id/proofs — the in-app authentication evidence. */
+export async function taskProofs(req, params) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+
+  const id = String(params?.id || '');
+  if (!UUID_RE.test(id)) return fail('a task id is required');
+
+  const rows = await sb.select('task_proofs', `task_id=eq.${id}&select=*`);
+  return ok({
+    proofs: rows.map(r => ({
+      taskId: r.task_id,
+      profileId: r.profile_id,
+      platform: r.platform,
+      postUrl: r.post_url,
+      screenshotUrl: r.screenshot_url,
+      views: r.views,
+      parsed: r.parsed,
+      verdict: r.verdict,
+      verdictSource: r.verdict_source,
+      submittedAt: r.created_at,
+    })),
+  });
+}
+
+/* ------------------------------------------------------------- plugins */
+
+/**
+ * GET /api/admin/plugins — REAL plugin inventory: live probes per provider,
+ * config presence, and termii balance. No staged "all green" answer.
+ */
+export async function pluginsProbe(req) {
+  const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
+  if (gate.error) return gate.error;
+
+  const plugins = [
+    { name: 'supabase', status: sb.configured() ? 'operational' : 'unconfigured', note: 'ledger + auth data' },
+    { name: 'termii-sms', status: termii.configured() ? 'operational' : 'unconfigured', note: 'OTP + promoter SMS' },
+    { name: 'flutterwave-cash', status: flw.configured() ? 'operational' : 'unconfigured', note: 'cash payouts + webhook' },
+    { name: 'data-aggregator', status: data.status().ready ? 'operational' : 'unconfigured', note: 'data bundle fulfilment' },
+    { name: 'sessions', status: session.configured() ? 'operational' : 'unconfigured', note: 'HMAC phone sessions' },
+  ];
+
+  let balance = null;
+  if (termii.configured()) {
+    try { balance = await termii.balance(); }
+    catch (e) { plugins[1].status = 'degraded'; plugins[1].note = `probe failed: ${String(e.message).slice(0, 80)}`; }
+  }
+
+  const socials = await social.probeAll().catch(() => ({}));
+
+  return ok({
+    checkedAt: new Date().toISOString(),
+    plugins,
+    termiiBalance: balance,
+    socials,
   });
 }

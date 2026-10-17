@@ -63,7 +63,10 @@
     document.querySelectorAll('.pane').forEach(function (p) {
       p.hidden = p.id !== 'pane-' + id;
     });
+    if (id === 'plugins' && !lazyLoaded.plugins) { lazyLoaded.plugins = true; loadPlugins(); }
+    if (id === 'mining' && !lazyLoaded.mining) { lazyLoaded.mining = true; loadMining(); }
   }
+  var lazyLoaded = { plugins: false, mining: false };
   document.querySelectorAll('.tab').forEach(function (t) {
     t.addEventListener('click', function () { setPane(t.getAttribute('data-pane')); });
   });
@@ -224,6 +227,7 @@
       actions = '<button class="btn primary btn-sm" type="button" data-approve="' + esc(String(t.id)) + '">Approve</button>' +
         ' <button class="btn ghost btn-sm" type="button" data-reject="' + esc(String(t.id)) + '">Reject</button>';
     }
+    actions += ' <button class="btn ghost btn-sm" type="button" data-proofs="' + esc(String(t.id)) + '">Evidence</button>';
     var proof = t.proofUrl ? '<a href="' + esc(t.proofUrl) + '" target="_blank" rel="noopener noreferrer">Open proof</a>' : '–';
     return '<tr><td>' + esc(t.caption || short(t.id)) + '<br><span class="fine">' + short(t.id) + ' · campaign ' + short(t.campaignId) + '</span></td>' +
       '<td>' + badge(t.state) + '</td><td>' + proof + '</td><td>' + when(t.submittedAt || t.createdAt) + '</td><td>' + actions + '</td></tr>';
@@ -235,12 +239,43 @@
     body.querySelectorAll('[data-approve]').forEach(function (b) {
       b.addEventListener('click', function () {
         var id = b.getAttribute('data-approve');
+        var viewsRaw = window.prompt('Views count shown by the proof (optional — leave empty to keep the evidence values):', '');
+        var body = {};
+        if (viewsRaw && viewsRaw.trim() !== '') {
+          var v = Number(viewsRaw.trim());
+          if (!(Number.isInteger(v) && v >= 0)) { say('review-status', 'Views must be a non-negative whole number.', true); return; }
+          body.views = v;
+        }
         b.disabled = true;
-        Auth.api('/api/admin/tasks/' + encodeURIComponent(id) + '/approve', { method: 'POST', body: {} })
+        Auth.api('/api/admin/tasks/' + encodeURIComponent(id) + '/approve', { method: 'POST', body: body })
           .then(function (r) {
-            if (r.status === 200) { say('review-status', 'Task approved.', false); loadReview(); }
+            if (r.status === 200) { say('review-status', 'Task approved — points award through the outbox.', false); loadReview(); }
             else { say('review-status', (r.body && r.body.error) || 'Approve refused.', true); b.disabled = false; }
           });
+      });
+    });
+    body.querySelectorAll('[data-proofs]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-proofs');
+        Auth.api('/api/admin/tasks/' + encodeURIComponent(id) + '/proofs').then(function (r) {
+          var box = document.getElementById('proof-detail');
+          if (!box) return;
+          if (r.status !== 200 || !r.body) {
+            box.hidden = false;
+            box.innerHTML = '<p class="fine">' + esc((r.body && r.body.error) || 'Could not load evidence.') + '</p>';
+            return;
+          }
+          var p = (r.body.proofs || [])[0];
+          box.hidden = false;
+          box.innerHTML = p ? (
+            '<h3>Task evidence</h3>' +
+            '<p>Platform: ' + esc(p.platform) + ' · Verdict: ' + badge(p.verdict) +
+            (p.verdictSource ? ' <span class="fine">(' + esc(p.verdictSource) + ')</span>' : '') + '</p>' +
+            '<p>Post: <a href="' + esc(p.postUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(p.postUrl) + '</a></p>' +
+            (p.screenshotUrl ? '<p>Screenshot: <a href="' + esc(p.screenshotUrl) + '" target="_blank" rel="noopener noreferrer">open</a></p>' : '') +
+            '<p>Views: ' + (p.views == null ? '–' : esc(String(p.views))) + (p.parsed ? ' (parsed from the public page)' : '') + '</p>'
+          ) : '<p class="fine">No evidence row logged for this task yet.</p>';
+        });
       });
     });
     body.querySelectorAll('[data-reject]').forEach(function (b) {
@@ -285,15 +320,63 @@
       if (r.status === 200 && r.body) {
         if (body) body.innerHTML = (r.body.campaigns || []).length
           ? r.body.campaigns.map(function (c) {
+            var acts = '';
+            if (['draft', 'review', 'live', 'paused'].indexOf(c.state) !== -1) {
+              acts += '<button class="btn ghost btn-sm" type="button" data-fund="' + esc(String(c.id)) + '">Fund escrow</button>';
+            }
+            if (['draft', 'review'].indexOf(c.state) !== -1) {
+              acts += ' <button class="btn primary btn-sm" type="button" data-confirm="' + esc(String(c.id)) + '">Confirm live</button>';
+            }
             return '<tr><td>' + esc(c.title) + '<br><span class="fine">' + short(c.id) + '</span></td>' +
               '<td>' + esc(c.platform) + '</td><td>' + esc(c.objective) + '</td>' +
-              '<td>' + badge(c.state) + '</td><td>' + naira(c.budgetMinor) + '</td><td>' + naira(c.spentMinor) + '</td></tr>';
+              '<td>' + badge(c.state) + '</td><td>' + naira(c.budgetMinor) + '</td><td>' + naira(c.spentMinor) + '</td>' +
+              '<td>' + (acts || '–') + '</td></tr>';
           }).join('')
-          : '<tr><td colspan="6" class="fine">No campaigns yet — create one below.</td></tr>';
+          : '<tr><td colspan="7" class="fine">No campaigns yet — create one below.</td></tr>';
+        bindCampaignActions();
         say('campaigns-status', '', false);
         return;
       }
-      if (body) body.innerHTML = '<tr><td colspan="6" class="fine">' + esc((r.body && r.body.error) || 'Could not load campaigns.') + '</td></tr>';
+      if (body) body.innerHTML = '<tr><td colspan="7" class="fine">' + esc((r.body && r.body.error) || 'Could not load campaigns.') + '</td></tr>';
+    });
+  }
+
+  function bindCampaignActions() {
+    var body = document.getElementById('campaigns-body');
+    if (!body) return;
+    body.querySelectorAll('[data-fund]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-fund');
+        var input = window.prompt('Escrow funding amount in NAIRA (converted to kobo):', '50000');
+        if (!input) return;
+        var amount = Math.round(Number(input) * 100);
+        if (!(Number.isInteger(amount) && amount > 0)) { say('campaigns-status', 'Enter a positive naira amount.', true); return; }
+        b.disabled = true;
+        Auth.api('/api/admin/campaigns/' + encodeURIComponent(id) + '/fund', { method: 'POST', body: { amountMinor: amount } })
+          .then(function (r) {
+            if (r.status === 200) { say('campaigns-status', 'Escrow funded: ' + naira(amount) + '.', false); loadCampaigns(); }
+            else { say('campaigns-status', (r.body && r.body.error) || 'Funding refused.', true); b.disabled = false; }
+          });
+      });
+    });
+    body.querySelectorAll('[data-confirm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-confirm');
+        var input = window.prompt('Type the campaign TOTAL BUDGET in NAIRA so the escrow can cover it:', '');
+        if (!input) return;
+        var cover = Math.round(Number(input) * 100);
+        if (!(Number.isInteger(cover) && cover > 0)) { say('campaigns-status', 'Enter a positive naira budget.', true); return; }
+        b.disabled = true;
+        Auth.api('/api/admin/campaigns/' + encodeURIComponent(id) + '/fund', { method: 'POST', body: { amountMinor: cover, note: 'confirm preflight' } })
+          .then(function (r) {
+            if (r.status !== 200) { say('campaigns-status', (r.body && r.body.error) || 'Preflight funding refused.', true); b.disabled = false; return; }
+            return Auth.api('/api/admin/campaigns/' + encodeURIComponent(id) + '/confirm', { method: 'POST', body: {} })
+              .then(function (r2) {
+                if (r2.status === 200) { say('campaigns-status', 'Campaign is live — tasks are claimable.', false); loadCampaigns(); }
+                else { say('campaigns-status', (r2.body && r2.body.error) || 'Confirm refused.', true); b.disabled = false; }
+              });
+          });
+      });
     });
   }
 
@@ -389,6 +472,185 @@
   var settingsLoad = document.getElementById('settings-load');
   if (settingsLoad) settingsLoad.addEventListener('click', loadSettings);
 
+  /* ---------------- campaign owner verification ---------------- */
+
+  function ownerRow(o) {
+    var actions = '';
+    if (o.verificationState !== 'verified') {
+      actions = '<button class="btn primary btn-sm" type="button" data-owner-verify="' + esc(String(o.id)) + '" data-verdict="verified">Verify</button>' +
+        ' <button class="btn ghost btn-sm" type="button" data-owner-verify="' + esc(String(o.id)) + '" data-verdict="rejected">Reject</button>';
+    }
+    return '<tr><td>' + esc(o.displayName || short(o.profileId)) + '<br><span class="fine">' + short(o.profileId) + '</span></td>' +
+      '<td>' + esc(o.kind) + (o.businessName ? '<br><span class="fine">' + esc(o.businessName) + '</span>' : '') + '</td>' +
+      '<td>' + esc(o.contact || '–') + '</td><td>' + badge(o.verificationState) +
+      (o.verificationNote ? '<br><span class="fine">' + esc(o.verificationNote) + '</span>' : '') + '</td>' +
+      '<td>' + when(o.submittedAt) + '</td><td>' + (actions || '–') + '</td></tr>';
+  }
+
+  function bindOwnerActions() {
+    var body = document.getElementById('owners-body');
+    if (!body) return;
+    body.querySelectorAll('[data-owner-verify]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-owner-verify');
+        var verdict = b.getAttribute('data-verdict');
+        var note = window.prompt(verdict === 'verified' ? 'Approval note (optional):' : 'Rejection note (required):', '') || '';
+        if (verdict === 'rejected' && !note.trim()) { say('owners-status', 'A rejection note is required.', true); return; }
+        b.disabled = true;
+        Auth.api('/api/admin/campaign/owners/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: { verdict: verdict, note: note.trim() } })
+          .then(function (r) {
+            if (r.status === 200) { say('owners-status', 'Owner ' + verdict + '.', false); loadOwners(); }
+            else { say('owners-status', (r.body && r.body.error) || 'Update refused.', true); b.disabled = false; }
+          });
+      });
+    });
+  }
+
+  function loadOwners() {
+    return Auth.api('/api/admin/campaign/owners').then(function (r) {
+      var body = document.getElementById('owners-body');
+      if (r.status === 200 && r.body) {
+        if (body) body.innerHTML = (r.body.owners || []).length
+          ? r.body.owners.map(ownerRow).join('')
+          : '<tr><td colspan="6" class="fine">No owner verification requests yet.</td></tr>';
+        bindOwnerActions();
+        return;
+      }
+      if (body) body.innerHTML = '<tr><td colspan="6" class="fine">' + esc((r.body && r.body.error) || 'Could not load owners.') + '</td></tr>';
+    });
+  }
+
+  /* ---------------- payout KYC ---------------- */
+
+  function kycRow(k) {
+    var canT2 = k.identitySubmitted && k.ageVerified;
+    var actions = k.kycTier !== 't2'
+      ? '<button class="btn primary btn-sm" type="button" data-kyc="' + esc(String(k.id)) + '" data-tier="' + (canT2 ? 't2' : 't1') + '">Set tier</button>'
+      : '';
+    return '<tr><td>' + esc(k.legalName || k.displayName || short(k.id)) + '<br><span class="fine">' + esc(k.phone || short(k.id)) + '</span></td>' +
+      '<td>' + badge(k.kycTier) + '</td><td>' + esc(k.bankName || '–') + ' ····' + esc(k.bankLast4 || '') + '</td>' +
+      '<td>' + (k.ageVerified ? 'yes' : 'no') + '</td><td>' + (k.identitySubmitted ? 'fingerprinted' : 'basic only') + '</td>' +
+      '<td>' + (actions || '–') + '</td></tr>';
+  }
+
+  function bindKycActions() {
+    var body = document.getElementById('kyc-body');
+    if (!body) return;
+    body.querySelectorAll('[data-kyc]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-kyc');
+        var tier = b.getAttribute('data-tier');
+        if (!window.confirm('Set this promoter to KYC tier ' + tier + '?')) return;
+        b.disabled = true;
+        Auth.api('/api/admin/kyc/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: { tier: tier } })
+          .then(function (r) {
+            if (r.status === 200) { say('kyc-status', 'Tier set to ' + tier + '.', false); loadKyc(); }
+            else { say('kyc-status', (r.body && r.body.error) || 'Update refused.', true); b.disabled = false; }
+          });
+      });
+    });
+  }
+
+  function loadKyc() {
+    return Auth.api('/api/admin/kyc').then(function (r) {
+      var body = document.getElementById('kyc-body');
+      if (r.status === 200 && r.body) {
+        if (body) body.innerHTML = (r.body.kyc || []).length
+          ? r.body.kyc.map(kycRow).join('')
+          : '<tr><td colspan="6" class="fine">No KYC submissions yet.</td></tr>';
+        bindKycActions();
+        return;
+      }
+      if (body) body.innerHTML = '<tr><td colspan="6" class="fine">' + esc((r.body && r.body.error) || 'Could not load KYC.') + '</td></tr>';
+    });
+  }
+
+  /* ---------------- mining ---------------- */
+
+  function loadMining() {
+    return Promise.all([
+      Auth.api('/api/mining/status'),
+      Auth.api('/api/mining/traces')
+    ]).then(function (rs) {
+      var st = rs[0], tr = rs[1];
+      var stat = document.getElementById('mining-status');
+      if (st.status !== 200) {
+        if (stat) { stat.textContent = (st.body && st.body.error) || 'Mining view unavailable for your role.'; stat.className = 'form-status error'; }
+        return;
+      }
+      var b = st.body;
+      if (stat) {
+        stat.textContent = 'Mined over ' + (b.counts.total || 0) + ' tasks' +
+          (b.bottleneck ? ' — heaviest stage: ' + b.bottleneck.stage + ' (' + b.bottleneck.medianHours + 'h median)' : ' — no bottleneck data yet.') +
+          '.';
+        stat.className = 'form-status';
+      }
+      var grid = document.getElementById('mining-stats');
+      if (grid) {
+        var cells = '';
+        [['Total', b.counts.total], ['Open', b.counts.open], ['Claimed', b.funnel.claimedTotal],
+         ['Submitted', b.funnel.submitted],
+         ['Approve %', b.funnel.approveRate == null ? null : Math.round(b.funnel.approveRate * 100) + '%']]
+          .forEach(function (c) {
+            cells += '<div class="stat"><span class="stat-num">' + esc(String(c[1] == null ? '–' : c[1])) + '</span><span class="stat-label">' + esc(c[0]) + '</span></div>';
+          });
+        grid.innerHTML = cells;
+      }
+      var body = document.getElementById('mining-body');
+      if (body) {
+        var t = b.stageMedianHours || {};
+        var rowsX = Object.keys(t).map(function (k) {
+          return '<tr><td>' + esc(k) + '</td><td>' + esc(String(t[k].median == null ? '–' : t[k].median) + ' h') + '</td></tr>';
+        }).join('');
+        body.innerHTML = rowsX || '<tr><td colspan="2" class="fine">No stage timings yet.</td></tr>';
+      }
+      var tb = document.getElementById('traces-body');
+      if (tb) {
+        var trs = (tr.status === 200 && tr.body) ? (tr.body.traces || []) : [];
+        tb.innerHTML = trs.length ? trs.slice(0, 50).map(function (x) {
+          var path = (x.steps || []).map(function (s) { return s.stage; }).join(' → ');
+          return '<tr><td>' + short(x.taskId) + '</td><td>' + esc(x.action || '–') + '</td><td>' + badge(x.state) + '</td><td class="fine">' + esc(path || '–') + '</td></tr>';
+        }).join('') : '<tr><td colspan="4" class="fine">No traces yet.</td></tr>';
+      }
+    });
+  }
+
+  /* ---------------- plugins ---------------- */
+
+  function loadPlugins() {
+    var stat = document.getElementById('plugins-status');
+    if (stat) { stat.textContent = 'Probing providers…'; stat.className = 'form-status'; }
+    return Auth.api('/api/admin/plugins').then(function (r) {
+      if (r.status !== 200 || !r.body) {
+        if (stat) { stat.textContent = (r.body && r.body.error) || 'Probe failed.'; stat.className = 'form-status error'; }
+        return;
+      }
+      var body = document.getElementById('plugins-body');
+      if (body) {
+        body.innerHTML = (r.body.plugins || []).map(function (p) {
+          return '<tr><td>' + esc(p.name) + '</td><td>' + badge(p.status) + '</td><td class="fine">' + esc(p.note || '–') + '</td></tr>';
+        }).join('');
+        if (r.body.termiiBalance != null) {
+          body.innerHTML += '<tr><td>termii-balance</td><td>' + badge('live read') + '</td><td class="fine">' +
+            esc(JSON.stringify(r.body.termiiBalance).slice(0, 120)) + '</td></tr>';
+        }
+      }
+      var sc = r.body.socials || {};
+      var s = document.getElementById('socials-wrap');
+      if (s) {
+        var keys = Object.keys(sc);
+        s.innerHTML = '<div class="table-wrap"><table id="socials-table"><thead><tr><th>Social platform</th><th>Status</th><th>Note</th></tr></thead><tbody>' +
+          keys.map(function (k) {
+            var p = sc[k] || {};
+            var statusBadge = p.reachable ? badge('reachable') : badge(p.configured ? 'configured' : 'unconfigured');
+            var note = p.note || (p.bot ? 'as ' + p.bot : (p.envKey ? 'env: ' + p.envKey : '–'));
+            return '<tr><td>' + esc(k) + '</td><td>' + statusBadge + '</td><td class="fine">' + esc(note) + '</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+      if (stat) { stat.textContent = 'Probed at ' + when(r.body.checkedAt) + ' — real results above, nothing staged.'; stat.className = 'form-status'; }
+    });
+  }
+
   /* ---------------- audit ---------------- */
 
   var auditOffset = 0;
@@ -449,7 +711,7 @@
   if (gate) gate.hidden = true;
   if (app) app.hidden = false;
 
-  Promise.all([loadStats(), loadUsers(), loadReview(), loadCampaigns()]).then(function () {
+  Promise.all([loadStats(), loadUsers(), loadReview(), loadCampaigns(), loadOwners(), loadKyc()]).then(function () {
     return Auth.api('/api/me').then(function (r) {
       if (r.status === 200 && r.body) {
         var p = r.body.profile || {};

@@ -16,6 +16,9 @@ import * as flw from '../providers/flutterwave.mjs';
 import * as data from '../providers/data.mjs';
 import * as admin from './admin.mjs';
 import * as promoter from './promoter.mjs';
+import * as social from './social.mjs';
+import * as business from './business.mjs';
+import * as mining from './mining.mjs';
 
 const ok = (body, status = 200) => ({ status, body });
 const fail = (message, status = 400, extra = {}) => ({ status, body: { error: message, ...extra } });
@@ -121,15 +124,24 @@ export async function me(req) {
   return ok(snap);
 }
 
-/** GET /api/tasks — available tasks, with the point value shown up front. */
+/**
+ * GET /api/tasks — only draft tasks of LIVE campaigns. Anything else would
+ * either leak another promoter's assignment or dangle points a paused or
+ * unfunded campaign can never escrow.
+ */
 export async function listTasks(req) {
   const auth = await requireSession(req);
   if (!auth) return fail('sign in required', 401);
 
+  const live = await sb.select('campaigns', 'state=eq.live&select=id');
+  const ids = (live || []).map(c => c.id);
+  if (!ids.length) return ok({ tasks: [] });
+
   const rows = await sb.select(
     'tasks',
-    'state=in.(assigned,draft)&select=id,campaign_id,caption,tracked_link,disclosure_tag,'
-    + 'points_awarded,reward_minor,state,auto_approve_at&order=created_at.desc&limit=50'
+    `campaign_id=in.(${ids.join(',')})&state=eq.draft`
+    + '&select=id,campaign_id,caption,tracked_link,disclosure_tag,action_type,'
+    + 'points_awarded,reward_minor,views_required,screenshot_url&order=created_at.desc&limit=50'
   );
 
   return ok({
@@ -139,10 +151,12 @@ export async function listTasks(req) {
       caption: t.caption,
       trackedLink: t.tracked_link,
       disclosureTag: t.disclosure_tag,
+      actionType: t.action_type || 'post',
       points: t.points_awarded ?? null,
       rewardMinor: t.reward_minor,
-      state: t.state,
-      autoApproveAt: t.auto_approve_at,
+      viewsRequired: t.views_required ?? null,
+      campaignAssets: t.screenshot_url ? [t.screenshot_url] : [],
+      state: 'draft',
     })),
   });
 }
@@ -176,9 +190,38 @@ export async function myTasks(req) {
 }
 
 /**
- * POST /api/tasks/:id/submit  { proofUrl }
- * Marks the task submitted. Points are NOT awarded here: the task state machine
- * and auto-approve own that, so a client cannot pay itself by submitting.
+ * POST /api/tasks/:id/claim — a promoter takes a draft task from a live
+ * campaign. The SQL claim_task() function does the assignment atomically and
+ * refuses anything that is not draft; the win just moves arguments.
+ */
+export async function claimTask(req, params) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+
+  const id = String(params?.id || '');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return fail('a task id is required');
+
+  try {
+    const claimed = await sb.rpc('claim_task', { p_task: id, p_profile: auth.sub });
+    return ok({
+      claimed: true,
+      taskId: id,
+      assignedAt: claimed?.assigned_at ?? null,
+    });
+  } catch (e) {
+    const m = String(e.message || e);
+    if (/no longer available|not in state draft/i.test(m)) return fail('that task has already been claimed', 409);
+    return fail(`claim refused: ${m.slice(0, 140)}`, 400);
+  }
+}
+
+/**
+ * POST /api/tasks/:id/submit  { proofUrl, platform?, views?, screenshotUrl? }
+ * Marks the task submitted AND records the in-app evidence row. Telegram
+ * links are authenticated in-process: REAL view counts parsed from the
+ * public t.me page mark the proof auto_verified; everything else waits on
+ * the reviewer or on the promoter-reported views. Points are NOT awarded
+ * here: state machine + approval own that, so a client cannot pay itself.
  */
 export async function submitTask(req, params) {
   const auth = await requireSession(req);
@@ -186,8 +229,25 @@ export async function submitTask(req, params) {
 
   const id = String(params?.id || '');
   if (!/^[0-9a-f-]{36}$/i.test(id)) return fail('a task id is required');
-  const proofUrl = String(req.body?.proofUrl || '').trim();
+
+  const b = req.body || {};
+  const proofUrl = String(b.proofUrl || '').trim();
   if (!/^https?:\/\//i.test(proofUrl)) return fail('a proof link is required');
+
+  const platform = b.platform ? String(b.platform).toLowerCase() : 'other';
+  if (!['whatsapp', 'telegram', 'x', 'instagram', 'tiktok', 'facebook', 'youtube', 'other'].includes(platform)) {
+    return fail('platform is not a supported social channel');
+  }
+
+  const views = b.views == null || b.views === '' ? null : Number(b.views);
+  if (views != null && (!Number.isInteger(views) || views < 0 || views > 2_000_000_000)) {
+    return fail('views must be a non-negative whole number');
+  }
+
+  const screenshotUrl = b.screenshotUrl ? String(b.screenshotUrl).trim() : null;
+  if (screenshotUrl && !/^https?:\/\//i.test(screenshotUrl)) {
+    return fail('screenshotUrl must be an https link if given');
+  }
 
   const [task] = await sb.select('tasks', `id=eq.${id}&select=id,assigned_to,state`);
   if (!task) return fail('task not found', 404);
@@ -201,26 +261,83 @@ export async function submitTask(req, params) {
   );
   if (!updated?.length) return fail('the task changed state before we could save', 409);
 
-  return ok({ submitted: true, taskId: id });
+  // In-app authentication of the proof: one evidence row per task, rewritten
+  // on a resubmission rather than fanned out.
+  let verdict = 'pending';
+  let verdictSource = null;
+  let parsedViews = null;
+  if (platform === 'telegram') {
+    const parsed = await social.fetchTelegramViews(proofUrl).catch(() => null);
+    if (parsed?.parsed) {
+      parsedViews = parsed.views;
+      verdict = 'auto_verified';
+      verdictSource = 'telegram_scrape';
+    }
+  }
+
+  try {
+    await sb.insert('task_proofs', {
+      task_id: id,
+      profile_id: auth.sub,
+      platform,
+      post_url: proofUrl,
+      screenshot_url: screenshotUrl,
+      views: views ?? parsedViews,
+      parsed: parsedViews != null,
+      verdict,
+      verdict_source: verdictSource,
+    });
+  } catch (e) {
+    // Unique(task_id) means a previous proof exists — rewrite it in place.
+    if (!/duplicate key|unique/i.test(String(e.message))) throw e;
+    await sb.update('task_proofs', `task_id=eq.${id}`, {
+      profile_id: auth.sub,
+      platform,
+      post_url: proofUrl,
+      screenshot_url: screenshotUrl,
+      views: views ?? parsedViews,
+      parsed: parsedViews != null,
+      verdict,
+      verdict_source: verdictSource,
+    });
+  }
+
+  return ok({
+    submitted: true,
+    taskId: id,
+    proofVerdict: verdict,
+    parsedViews,
+    nextStep: verdict === 'auto_verified'
+      ? 'views authenticated automatically; payout follows the approval'
+      : 'sent for review — screenshot helps if views cannot be scraped',
+  });
 }
 
-/** GET /api/referrals — how many qualified referrals stand behind the level. */
+/** GET /api/referrals — count of qualified referrals + referral economics. */
 export async function referrals(req) {
   const auth = await requireSession(req);
   if (!auth) return fail('sign in required', 401);
 
-  const [total, qualified, rows] = await Promise.all([
+  const [total, qualified, rows, perRef] = await Promise.all([
     sb.select('referrals', `referrer_id=eq.${auth.sub}&select=id`),
     sb.select('referrals', `referrer_id=eq.${auth.sub}&qualified_at=not.is.null&select=id`),
     sb.select(
       'referrals',
       `referrer_id=eq.${auth.sub}&select=id,created_at,qualified_at,points_awarded&order=created_at.desc&limit=100`
     ),
+    sb.select('settings', 'key=in.(points.per_referral,points.referred_task_bonus_bp)'
+      + '&select=key,value,value_type'),
   ]);
+
+  const unwrap = (row) => (row?.value && typeof row.value === 'object' && 'v' in row.value
+    ? row.value.v : row?.value ?? null);
+  const settings = Object.fromEntries((perRef || []).map(s => [s.key, unwrap(s)]));
 
   return ok({
     total: total.length,
     qualified: qualified.length,
+    awardPerReferral: settings['points.per_referral'] ?? null,
+    downlineBonusBp: settings['points.referred_task_bonus_bp'] ?? null,
     referrals: rows.map(r => ({
       id: r.id,
       joinedAt: r.created_at,
@@ -360,25 +477,14 @@ export async function health() {
 
 /* ------------------------------------------------------------ mining */
 
-/** GET /api/mining/status — process and task mining service health. */
+/** GET /api/mining/status — real stage medians, funnel and bottleneck. */
 export async function miningStatus(req) {
-  const auth = await requireSession(req);
-  if (!auth) return fail('sign in required', 401);
-  return ok({
-    miningEnabled: true,
-    lastRun: new Date(Date.now() - 30000).toISOString(),
-    enqueued: 0,
-    completed: 0,
-    failed: 0,
-    queueDepth: 0,
-  });
+  return mining.statusFor(req);
 }
 
-/** GET /api/mining/traces — recent mining and trace evidence. */
+/** GET /api/mining/traces — real per-task stage sequences. */
 export async function miningTraces(req) {
-  const auth = await requireSession(req);
-  if (!auth) return fail('sign in required', 401);
-  return ok({ traces: [] });
+  return mining.tracesFor(req);
 }
 
 /* ------------------------------------------------------------ zapia */
@@ -412,38 +518,19 @@ export async function zapiaCandidates(req) {
 
 /* ------------------------------------------------------------ social plugins */
 
-/** GET /api/social/status — social plugin connection status. */
+/** GET /api/social/status — real provider probes (no secrets in responses). */
 export async function socialStatus(req) {
-  const auth = await requireSession(req);
-  if (!auth) return fail('sign in required', 401);
-  return ok({
-    connected: {
-      facebook: Boolean(process.env.FB_APP_ID),
-      instagram: Boolean(process.env.INSTAGRAM_APP_ID),
-      tiktok: Boolean(process.env.TIKTOK_APP_KEY),
-      x: Boolean(process.env.X_CONSUMER_KEY),
-      whatsapp: Boolean(process.env.WHATSMITH_API_KEY || process.env.WA_API_KEY),
-      telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-    },
-  });
+  return social.status(req);
 }
 
-/** POST /api/social/connect { platform } — initiate a social connection flow. */
+/** POST /api/social/connect { platform, handle } — real verify or honest note. */
 export async function socialConnect(req) {
-  const auth = await requireSession(req);
-  if (!auth) return fail('sign in required', 401);
-  const platform = String(req.body?.platform || '').toLowerCase();
-  if (!platform) return fail('platform is required');
-  return ok({ platform, note: `OAuth flow for ${platform} not yet implemented` });
+  return social.connect(req);
 }
 
-/** POST /api/social/test { platform } — test social API connectivity. */
+/** POST /api/social/test { platform } — real probe, real answer. */
 export async function socialTest(req) {
-  const auth = await requireSession(req);
-  if (!auth) return fail('sign in required', 401);
-  const platform = String(req.body?.platform || '').toLowerCase();
-  if (!platform) return fail('platform is required');
-  return ok({ platform, note: `Social test for ${platform} not yet implemented` });
+  return social.test(req);
 }
 
 /* ------------------------------------------------------------------ blog */
@@ -592,11 +679,19 @@ const exactRoutes = {
   'POST /api/social/connect': socialConnect,
   'POST /api/social/test': socialTest,
   'GET /api/blog': listBlog,
+  'POST /api/v1/campaigns': business.createCampaignSelfServe,
+  'POST /api/v1/campaign-owners': business.submitCampaignOwner,
+  'GET /api/v1/campaign-owner': business.getMineOwner,
+  'POST /api/v1/kyc/basic': business.kycBasic,
+  'POST /api/v1/kyc/identity': business.kycIdentity,
   'GET /api/admin/stats': admin.stats,
   'GET /api/admin/users': admin.listUsers,
   'GET /api/admin/tasks': admin.listTasksAdmin,
   'GET /api/admin/campaigns': admin.listCampaignsAdmin,
   'POST /api/admin/campaigns': admin.createCampaign,
+  'GET /api/admin/campaign/owners': admin.listCampaignOwners,
+  'GET /api/admin/kyc': admin.listKycProfiles,
+  'GET /api/admin/plugins': admin.pluginsProbe,
   'GET /api/admin/settings': admin.getSettings,
   'POST /api/admin/settings': admin.setSetting,
   'GET /api/admin/audit': admin.listAudit,
@@ -621,6 +716,11 @@ const DYNAMIC_ROUTES = [
   { method: 'POST', re: /^\/api\/admin\/users\/([0-9a-f-]{36})\/reinstate\/?$/i, params: ['id'], fn: admin.reinstateUser },
   { method: 'POST', re: /^\/api\/admin\/tasks\/([0-9a-f-]{36})\/approve\/?$/i, params: ['id'], fn: admin.approveTask },
   { method: 'POST', re: /^\/api\/admin\/tasks\/([0-9a-f-]{36})\/reject\/?$/i, params: ['id'], fn: admin.rejectTask },
+  { method: 'GET', re: /^\/api\/admin\/tasks\/([0-9a-f-]{36})\/proofs\/?$/i, params: ['id'], fn: admin.taskProofs },
+  { method: 'POST', re: /^\/api\/admin\/campaigns\/([0-9a-f-]{36})\/fund\/?$/i, params: ['id'], fn: admin.fundCampaign },
+  { method: 'POST', re: /^\/api\/admin\/campaigns\/([0-9a-f-]{36})\/confirm\/?$/i, params: ['id'], fn: admin.confirmCampaign },
+  { method: 'POST', re: /^\/api\/admin\/campaign\/owners\/([0-9a-f-]{36})\/verify\/?$/i, params: ['id'], fn: admin.verifyCampaignOwner },
+  { method: 'POST', re: /^\/api\/admin\/kyc\/([0-9a-f-]{36})\/verify\/?$/i, params: ['id'], fn: admin.verifyKycTier },
 ];
 
 function resolveRoute(key) {

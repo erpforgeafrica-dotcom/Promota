@@ -20,7 +20,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { join, dirname, extname, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { routes, submitTask } from './api/routes.mjs';
+import { routes, submitTask, claimTask } from './api/routes.mjs';
 import { ready as checkReady } from './api/readyz.mjs';
 import * as worker from './api/worker.mjs';
 
@@ -182,6 +182,7 @@ function readBody(req) {
  * Kept explicit rather than clever: there are ten endpoints.
  */
 const PATTERNS = [
+  { method: 'POST', re: /^\/api\/tasks\/([0-9a-f-]{36})\/claim$/i, handler: claimTask, params: ['id'] },
   { method: 'POST', re: /^\/api\/tasks\/([0-9a-f-]{36})\/submit$/i, handler: submitTask, params: ['id'] },
 ];
 

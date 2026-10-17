@@ -131,6 +131,34 @@ const handlers = {
 
   /** Task auto-approved by the DB sweeper; the points move with it. */
   'task.auto_approved': async (p) => ({ delivered: true, note: `task ${p.task_id} auto-approved` }),
+
+  /**
+   * Manual admin approval: award through the SAME idempotent SQL path the
+   * sweeper uses (referral slice + views bonus included). Retries are safe
+   * because every ledger write behind these functions carries an idem key.
+   */
+  'task.approved': async (p) => {
+    const points = await sb.rpc('award_task_points_networked', { p_task: p.task_id });
+    let views = 0;
+    try { views = await sb.rpc('award_views_bonus', { p_task: p.task_id }); }
+    catch (e) { log(`views bonus failed for ${p.task_id}:`, String(e.message).slice(0, 160)); }
+    return { delivered: true, note: `task ${p.task_id} approved: ${points} pts, views bonus ${views}` };
+  },
+
+  /** The DB recorded the claim; the promoter does the work off this loop. */
+  'task.claimed': async (p) => ({ delivered: true, note: `task ${p.task_id} claimed` }),
+
+  /** Referral downline bonus: the referrer is the payload's referrer_id. */
+  'referral_network.awarded': async (p) => {
+    const rows = await sb.select('profiles', `id=eq.${p.referrer_id}&select=phone_e164`);
+    const phone = rows?.[0]?.phone_e164;
+    if (!phone) return { delivered: true, note: 'no phone on file' };
+    await termii.sendSms({
+      to: phone,
+      message: `Promota: your referral earned you ${p.points} points for a completed task. Keep them going.`,
+    });
+    return { delivered: true };
+  },
 };
 
 const unknownTopics = new Set();
@@ -175,7 +203,9 @@ export async function sweep() {
   const approved = Array.isArray(stale) ? stale : [];
   for (const t of approved) {
     try {
-      const points = await sb.rpc('award_task_points', { p_task: t.id });
+      const points = await sb.rpc('award_task_points_networked', { p_task: t.id });
+      try { await sb.rpc('award_views_bonus', { p_task: t.id }); }
+      catch (e) { log(`views bonus skipped for ${t.id}:`, String(e.message).slice(0, 160)); }
       log(`auto-approved task ${t.id}, awarded ${points} points`);
     } catch (e) {
       log(`auto-approved task ${t.id} but award failed:`, String(e.message).slice(0, 160));

@@ -216,7 +216,7 @@ await withDb(async db => {
 
     const bal = await scalar(db,
       `select points_balance('11111111-1111-1111-1111-111111111111') as v`);
-    check('referral points land for the REFERRER (100 + 150)', bal === 250, `balance=${bal}`);
+    check('referral points land for the REFERRER (100 + 300)', bal === 400, `balance=${bal}`);
 
     const again = await scalar(db,
       `select qualify_referral('22222222-2222-2222-2222-222222222222') as v`);
@@ -224,7 +224,7 @@ await withDb(async db => {
 
     const bal2 = await scalar(db,
       `select points_balance('11111111-1111-1111-1111-111111111111') as v`);
-    check('referral points are paid once', bal2 === 250, `balance=${bal2}`);
+    check('referral points are paid once', bal2 === 400, `balance=${bal2}`);
 
     const cash = await scalar(db,
       `select count(*)::int as v from point_entries
@@ -297,8 +297,8 @@ await withDb(async db => {
 
     const bal = await scalar(db,
       `select points_balance('11111111-1111-1111-1111-111111111111') as v`);
-    // 100 task + 150 referral + 3750 adjustment = 4000, minus the 500 redeemed
-    check('redeeming debits the points (4000 - 500 = 3500)', bal === 3500, `balance=${bal}`);
+    // 100 task + 300 referral + 3750 adjustment = 4150, minus the 500 redeemed
+    check('redeeming debits the points (4150 - 500 = 3650)', bal === 3650, `balance=${bal}`);
 
     const replay = await scalar(db, `
       select count(*)::int as v from redemptions where idempotency_key = 'redeem-d-ok'`);
@@ -306,7 +306,7 @@ await withDb(async db => {
 
     const bal2 = await scalar(db,
       `select points_balance('11111111-1111-1111-1111-111111111111') as v`);
-    check('replaying the same redemption does not double-debit', bal2 === 3500, `balance=${bal2}`);
+    check('replaying the same redemption does not double-debit', bal2 === 3650, `balance=${bal2}`);
   }
 
   /* ---------------------------- 15. fulfilment needs provider evidence */
@@ -364,7 +364,7 @@ await withDb(async db => {
     await accepts(db, 'that referral qualifies', `select qualify_referral('11111111-1111-1111-1111-111111111111')`);
     const bal = await scalar(db,
       `select points_balance('33333333-3333-3333-3333-333333333333') as v`);
-    check('the new referrer earns exactly one referral award (150)', bal === 150, `balance=${bal}`);
+    check('the new referrer earns exactly one referral award (300)', bal === 300, `balance=${bal}`);
   }
 
   /* ------------------------------------- 20. every promoter starts at L1 */

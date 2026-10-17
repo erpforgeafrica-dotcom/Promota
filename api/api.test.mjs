@@ -107,10 +107,43 @@ const routes = await import('../api/routes.mjs');
     'GET /api/referrals',
     'POST /api/webhooks/flutterwave',
     'GET /healthz',
+    'GET /api/mining/status',
+    'GET /api/mining/traces',
+    'GET /api/social/status',
+    'POST /api/social/connect',
+    'POST /api/social/test',
+    'POST /api/v1/campaigns',
+    'POST /api/v1/campaign-owners',
+    'GET /api/v1/campaign-owner',
+    'POST /api/v1/kyc/basic',
+    'POST /api/v1/kyc/identity',
+    'GET /api/admin/campaign/owners',
+    'GET /api/admin/kyc',
+    'GET /api/admin/plugins',
+    'GET /api/v1/promoter/earnings',
+    'GET /api/v1/promoter/referrals',
+    'GET /api/v1/promoter/payouts',
   ];
   for (const r of expected) {
     check(`route ${r} is registered`, typeof routes.routes[r] === 'function');
   }
+
+  // dynamic routes resolve through the proxy as handlers too; the two task
+  // routes live in server.mjs's PATTERNS, so their handlers are checked directly
+  for (const p of [
+    'POST /api/admin/tasks/0b0e0000-0000-0000-0000-000000000001/approve',
+    'GET /api/admin/tasks/0b0e0000-0000-0000-0000-000000000001/proofs',
+    'POST /api/admin/campaigns/0b0e0000-0000-0000-0000-000000000001/fund',
+    'POST /api/admin/campaigns/0b0e0000-0000-0000-0000-000000000001/confirm',
+    'POST /api/admin/campaign/owners/0b0e0000-0000-0000-0000-000000000001/verify',
+    'POST /api/admin/kyc/0b0e0000-0000-0000-0000-000000000001/verify',
+  ]) {
+    check(`dynamic route ${p} is registered`, typeof routes.routes[p] === 'function');
+  }
+  check('task claim handler exists for the server PATTERNS table',
+    typeof routes.claimTask === 'function');
+  check('task submit handler exists for the server PATTERNS table',
+    typeof routes.submitTask === 'function');
 }
 
 /* ------------------------------------- validation refusals (no DB reached) */
@@ -202,7 +235,10 @@ const routes = await import('../api/routes.mjs');
 /* ---------------------------------------------- worker handlers registered */
 {
   const worker = await import('../api/worker.mjs');
-  for (const t of ['lead.captured', 'points.awarded', 'referral.qualified', 'redemption.requested', 'task.auto_approved']) {
+  for (const t of [
+    'lead.captured', 'points.awarded', 'referral.qualified', 'redemption.requested',
+    'task.auto_approved', 'task.approved', 'task.claimed', 'referral_network.awarded',
+  ]) {
     check(`worker handles outbox topic "${t}"`, typeof worker.handlers[t] === 'function');
   }
 }
