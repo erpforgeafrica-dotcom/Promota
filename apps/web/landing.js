@@ -1,6 +1,10 @@
-/* landing.js — modal dialog + theme toggle for the Promota landing page.
-   External (not inline) so the page can ship a strict CSP (script-src 'self').
-   Mirrors theme-boot.js: stored choice wins, then OS preference, then dark. */
+/* landing.js — theme, mobile menu, FAQ accordion, and the REAL phone-OTP
+   auth modal for the Promota landing pages.
+   External (not inline) so pages ship a strict CSP (script-src 'self').
+   The modal talks to the live backend: POST /api/auth/otp/request, then
+   POST /api/auth/otp/verify, which returns the session bearer. Signing in and
+   signing up are the same flow — a first-time verify creates the account
+   (api/routes.mjs verifyOtp). */
 (function () {
   'use strict';
 
@@ -24,56 +28,163 @@
     });
   }
 
-  /* ---------- modal ---------- */
+  /* ---------- auth modal: phone step -> OTP step -> dashboard ---------- */
   var modal = document.getElementById('modal');
-  var modalContent = document.getElementById('modal-content');
-  var loginBtn = document.getElementById('login-btn');
-  var signupBtn = document.getElementById('signup-btn');
-  var loginCta = document.getElementById('login-cta');
-  var signupCta = document.getElementById('signup-cta');
-  var finalCta = document.getElementById('final-cta');
-  var closeModal = document.getElementById('close-modal');
-  var switchToSignup = document.getElementById('switch-to-signup');
   var authForm = document.getElementById('auth-form');
+  if (!modal || !authForm || !window.PromotaAuth) return;
+
   var modalTitle = document.getElementById('modal-title');
   var modalSubtitle = document.getElementById('modal-subtitle');
-  if (!modal || !authForm) return;
+  var modalContent = document.getElementById('modal-content');
+  var phoneStep = document.getElementById('auth-phone-step');
+  var otpStep = document.getElementById('auth-otp-step');
+  var phoneInput = document.getElementById('auth-phone');
+  var otpInput = document.getElementById('auth-otp');
+  var otpHint = document.getElementById('auth-otp-hint');
+  var statusEl = document.getElementById('auth-status');
+  var submitBtn = document.getElementById('auth-submit');
+  var backBtn = document.getElementById('auth-back');
+  var closeModalBtn = document.getElementById('close-modal');
 
-  function openModal(mode) {
-    modal.hidden = false;
-    if (mode === 'login') {
-      modalTitle.textContent = 'Login';
-      modalSubtitle.textContent = 'Enter your credentials';
-    } else {
-      modalTitle.textContent = 'Signup';
-      modalSubtitle.textContent = 'Create your account';
-    }
+  var mode = 'login';
+  var pendingPhone = '';
+  var pendingPinId = '';
+  var busy = false;
+
+  function say(message, isError) {
+    if (!statusEl) return;
+    statusEl.textContent = message || '';
+    statusEl.className = 'form-status' + (isError ? ' error' : '');
+  }
+
+  function showPhoneStep() {
+    if (phoneStep) phoneStep.hidden = false;
+    if (otpStep) otpStep.hidden = true;
+    if (backBtn) backBtn.hidden = true;
+    if (submitBtn) submitBtn.textContent = mode === 'login' ? 'Send code' : 'Create free account';
+    if (otpInput) otpInput.value = '';
+    pendingPinId = '';
+    say('');
+    if (phoneInput) phoneInput.focus();
+  }
+
+  function showOtpStep(network) {
+    if (phoneStep) phoneStep.hidden = true;
+    if (otpStep) otpStep.hidden = false;
+    if (backBtn) backBtn.hidden = false;
+    if (submitBtn) submitBtn.textContent = 'Verify code';
+    if (otpHint) otpHint.textContent = 'Code sent to ' + pendingPhone +
+      (network ? ' (' + network + ')' : '') + '. It expires quickly.';
+    say('');
+    if (otpInput) otpInput.focus();
+  }
+
+  function openModal(requestedMode) {
+    mode = requestedMode === 'signup' ? 'signup' : 'login';
+    if (modalTitle) modalTitle.textContent = mode === 'signup' ? 'Sign up' : 'Sign in';
+    if (modalSubtitle) modalSubtitle.textContent = mode === 'signup'
+      ? 'Create your account with your phone number'
+      : 'Enter your phone number to continue';
     authForm.reset();
-    var first = modalContent.querySelector('input, button');
-    if (first) first.focus();
+    showPhoneStep();
+    modal.hidden = false;
+    if (phoneInput) phoneInput.focus();
   }
   function closeModalFn() { modal.hidden = true; }
 
-  if (loginBtn) loginBtn.addEventListener('click', function () { openModal('login'); });
-  if (signupBtn) signupBtn.addEventListener('click', function () { openModal('signup'); });
-  if (loginCta) loginCta.addEventListener('click', function () { openModal('login'); });
-  if (signupCta) signupCta.addEventListener('click', function () { openModal('signup'); });
-  if (finalCta) finalCta.addEventListener('click', function () { openModal('login'); });
-  if (closeModal) closeModal.addEventListener('click', closeModalFn);
-  if (switchToSignup) switchToSignup.addEventListener('click', function () { openModal('signup'); });
+  if (closeModalBtn) closeModalBtn.addEventListener('click', closeModalFn);
   modal.addEventListener('click', function (e) { if (e.target === modal) closeModalFn(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) closeModalFn(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !modal.hidden) closeModalFn();
+  });
+  if (backBtn) backBtn.addEventListener('click', showPhoneStep);
+
+  /* One delegated handler: the CURRENT data-auth value decides the action, so
+     the signed-in rename below can flip buttons to 'dashboard' safely. */
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-auth]') : null;
+    if (!el) return;
+    var requested = el.getAttribute('data-auth');
+    if (requested === 'dashboard') {
+      e.preventDefault();
+      window.location.href = '/dashboard.html';
+      return;
+    }
+    openModal(requested || 'login');
+  });
+  ['login-btn', 'signup-btn', 'login-cta', 'signup-cta', 'final-cta'].forEach(function (id) {
+    var btn = document.getElementById(id);
+    if (!btn) return;
+    btn.setAttribute('data-auth', id.indexOf('signup') === 0 ? 'signup' : 'login');
+  });
+
   authForm.addEventListener('submit', function (e) {
     e.preventDefault();
-    closeModalFn();
+    if (busy) return;
+
+    if (pendingPinId) {
+      /* ---- OTP step ---- */
+      var pin = otpInput ? otpInput.value.trim() : '';
+      if (!/^\d{4,8}$/.test(pin)) { say('Enter the code from the SMS.', true); return; }
+      busy = true;
+      if (submitBtn) submitBtn.disabled = true;
+      say('Checking the code…');
+      window.PromotaAuth.verifyOtp(pendingPhone, pendingPinId, pin).then(function (r) {
+        if (r.status === 200 && r.body && r.body.token) {
+          say('Signed in. Opening your dashboard…');
+          window.location.href = '/dashboard.html';
+          return;
+        }
+        busy = false;
+        if (submitBtn) submitBtn.disabled = false;
+        var msg = (r.body && r.body.error) || 'That code is not valid.';
+        if (r.status === 503) msg = 'SMS service is not configured on the server yet.';
+        say(msg, true);
+        if (otpInput) otpInput.focus();
+      });
+      return;
+    }
+
+    /* ---- phone step ---- */
+    var normalised = window.PromotaAuth.normalisePhone(phoneInput ? phoneInput.value : '');
+    if (!normalised) {
+      say('Use a Nigerian number, for example 0803 000 0000 or +234 803 000 0000.', true);
+      if (phoneInput) phoneInput.focus();
+      return;
+    }
+    busy = true;
+    if (submitBtn) submitBtn.disabled = true;
+    say('Sending the code…');
+    window.PromotaAuth.requestOtp(normalised).then(function (r) {
+      if (r.status === 200 && r.body && r.body.sent && r.body.pinId) {
+        pendingPhone = r.body.phone || normalised;
+        pendingPinId = r.body.pinId;
+        busy = false;
+        if (submitBtn) submitBtn.disabled = false;
+        showOtpStep(r.body.network);
+        return;
+      }
+      busy = false;
+      if (submitBtn) submitBtn.disabled = false;
+      var msg = (r.body && r.body.error) || 'Could not send the code. Please try again.';
+      if (r.status === 503) msg = 'SMS service is not configured on the server yet.';
+      say(msg, true);
+      if (phoneInput) phoneInput.focus();
+    });
   });
-})();
 
-/* ---------- landing additions: mobile menu, FAQ accordion, data-auth hooks ---------- */
-(function () {
-  'use strict';
+  /* ---------- signed-in state: nav buttons become a dashboard link ---------- */
+  if (window.PromotaAuth.getToken()) {
+    ['login-btn', 'login-cta', 'final-cta', 'login-m', 'signup-btn', 'signup-cta', 'signup-m'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (!b) return;
+      b.textContent = id.indexOf('signup') === 0 ? 'Open dashboard' : 'Dashboard';
+      b.setAttribute('data-auth', 'dashboard');
+      b.removeAttribute('id');
+    });
+  }
 
-  /* mobile menu toggle */
+  /* ---------- mobile menu ---------- */
   var menuBtn = document.getElementById('menu-btn');
   var mobileMenu = document.getElementById('mobile-menu');
   if (menuBtn && mobileMenu) {
@@ -89,7 +200,7 @@
     });
   }
 
-  /* FAQ accordion: .q click toggles .a.open + aria-expanded */
+  /* ---------- FAQ accordion: .q click toggles .a.open + aria-expanded ---------- */
   document.querySelectorAll('.q').forEach(function (q) {
     q.addEventListener('click', function () {
       var expanded = q.getAttribute('aria-expanded') === 'true';
@@ -102,33 +213,7 @@
     });
   });
 
-  /* data-auth buttons open the shared modal without the fixed nav/hero IDs */
-  var modalEl = document.getElementById('modal');
-  if (modalEl) {
-    var openAuth = function (mode) {
-      modalEl.hidden = false;
-      var title = document.getElementById('modal-title');
-      var subtitle = document.getElementById('modal-subtitle');
-      if (title && subtitle) {
-        if (mode === 'login') {
-          title.textContent = 'Login';
-          subtitle.textContent = 'Enter your credentials';
-        } else {
-          title.textContent = 'Signup';
-          subtitle.textContent = 'Create your account';
-        }
-      }
-      var form = document.getElementById('auth-form');
-      if (form) form.reset();
-    };
-    document.querySelectorAll('[data-auth]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        openAuth(el.getAttribute('data-auth') || 'signup');
-      });
-    });
-  }
-
-  /* mobile theme toggle mirrors the nav toggle */
+  /* ---------- mobile theme toggle mirrors the nav toggle ---------- */
   var menuTheme = document.getElementById('themeBtnMenu');
   if (menuTheme) {
     var isLight = function () {
@@ -142,8 +227,8 @@
       var next = isLight() ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', next);
       try { localStorage.setItem('owoworks-theme', next); } catch (e) { /* storage unavailable */ }
-      var meta = document.getElementById('themeColor');
-      if (meta) meta.setAttribute('content', next === 'light' ? '#f4f7f2' : '#04120b');
+      var meta2 = document.getElementById('themeColor');
+      if (meta2) meta2.setAttribute('content', next === 'light' ? '#f4f7f2' : '#04120b');
       syncMenuTheme();
       var navTheme = document.getElementById('themeBtnNav');
       if (navTheme) navTheme.setAttribute('aria-pressed', next === 'light' ? 'true' : 'false');

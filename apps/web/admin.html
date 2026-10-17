@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en-NG">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#04120b" id="themeColor">
+  <title>Admin Console — Promota</title>
+  <meta name="description" content="Promota admin console: platform stats, user management, task review, campaigns, settings and the audit trail.">
+  <script src="/theme-boot.js"></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a href="/" class="brand" aria-label="Promota home">
+        <span class="brand-name"><span class="ow">Pro</span><span class="works">mota</span> admin</span>
+      </a>
+      <div class="nav-cta">
+        <span class="fine" id="whoami" hidden></span>
+        <button id="dash-link" class="theme-btn" type="button" hidden>My dashboard</button>
+        <button id="signout" class="theme-btn" type="button">Sign out</button>
+        <button id="themeBtnAdmin" class="theme-btn" type="button" aria-pressed="false" aria-label="Toggle light and dark theme">Theme</button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+  <section class="section">
+    <section id="gate" class="panel" hidden>
+      <h2 id="gate-title">Sign in required</h2>
+      <p id="gate-copy"></p>
+      <p><a class="btn gold" href="/">Sign in</a> <a class="theme-btn" href="/dashboard.html">My dashboard</a></p>
+    </section>
+
+    <section id="app" hidden>
+      <p class="eyebrow">Owner workspace</p>
+      <h1>Admin console</h1>
+      <div id="load-status" class="form-status" role="status"></div>
+
+      <div class="tabs" role="tablist" aria-label="Admin sections">
+        <button class="tab active" role="tab" aria-checked="true" data-pane="stats" type="button">Overview</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="users" type="button">Users</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="review" type="button">Task review</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="campaigns" type="button">Campaigns</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="settings" type="button">Settings</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="audit" type="button">Audit trail</button>
+      </div>
+
+      <!-- Stats -->
+      <section id="pane-stats" class="pane" role="tabpanel">
+        <div class="stat-grid">
+          <div class="stat"><span class="stat-num" id="st-users">–</span><span class="stat-label">Users</span></div>
+          <div class="stat"><span class="stat-num" id="st-tasks">–</span><span class="stat-label">Tasks</span></div>
+          <div class="stat"><span class="stat-num" id="st-campaigns">–</span><span class="stat-label">Campaigns</span></div>
+          <div class="stat"><span class="stat-num" id="st-budget">–</span><span class="stat-label">Campaign budget</span></div>
+          <div class="stat"><span class="stat-num" id="st-spent">–</span><span class="stat-label">Campaign spend</span></div>
+          <div class="stat"><span class="stat-num" id="st-payouts">–</span><span class="stat-label">Payouts total</span></div>
+          <div class="stat"><span class="stat-num" id="st-redemptions">–</span><span class="stat-label">Redemptions</span></div>
+          <div class="stat"><span class="stat-num" id="st-disputes">–</span><span class="stat-label">Disputes</span></div>
+        </div>
+        <div class="table-wrap"><table id="breakdown-table"><thead><tr><th>Group</th><th>Key</th><th>Count</th></tr></thead><tbody id="breakdown-body"></tbody></table></div>
+        <p class="fine" id="st-refresh-note"><button id="st-refresh" class="btn ghost" type="button">Refresh stats</button></p>
+      </section>
+
+      <!-- Users -->
+      <section id="pane-users" class="pane" role="tabpanel" hidden>
+        <form id="users-filter" class="filter-bar">
+          <select id="users-state" aria-label="Filter by state">
+            <option value="">Any state</option>
+            <option value="pending">pending</option>
+            <option value="active">active</option>
+            <option value="suspended">suspended</option>
+            <option value="banned">banned</option>
+          </select>
+          <select id="users-role" aria-label="Filter by role">
+            <option value="">Any role</option>
+            <option value="promoter">promoter</option>
+            <option value="business">business</option>
+            <option value="partner">partner</option>
+            <option value="support">support</option>
+            <option value="finance">finance</option>
+            <option value="admin">admin</option>
+            <option value="owner">owner</option>
+          </select>
+          <input type="text" id="users-q" placeholder="Search name or phone" maxlength="60">
+          <button type="submit" class="btn primary">Filter</button>
+        </form>
+        <div id="users-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table id="users-table"><thead><tr><th>User</th><th>Role</th><th>State</th><th>KYC</th><th>Trust</th><th>Joined</th><th>Actions</th></tr></thead><tbody id="users-body"></tbody></table></div>
+        <div id="user-detail" class="panel" hidden></div>
+      </section>
+
+      <!-- Task review -->
+      <section id="pane-review" class="pane" role="tabpanel" hidden>
+        <form id="review-filter" class="filter-bar">
+          <select id="review-state" aria-label="Filter tasks by state">
+            <option value="submitted">submitted</option>
+            <option value="checking">checking</option>
+            <option value="held">held</option>
+            <option value="approved">approved</option>
+            <option value="rejected">rejected</option>
+            <option value="draft">draft</option>
+            <option value="assigned">assigned</option>
+            <option value="paid">paid</option>
+            <option value="expired">expired</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+          <button type="submit" class="btn primary">Load queue</button>
+        </form>
+        <div id="review-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table id="review-table"><thead><tr><th>Task</th><th>State</th><th>Proof</th><th>Submitted</th><th>Actions</th></tr></thead><tbody id="review-body"></tbody></table></div>
+      </section>
+
+      <!-- Campaigns -->
+      <section id="pane-campaigns" class="pane" role="tabpanel" hidden>
+        <div id="campaigns-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table id="campaigns-table"><thead><tr><th>Title</th><th>Platform</th><th>Objective</th><th>State</th><th>Budget</th><th>Spent</th></tr></thead><tbody id="campaigns-body"></tbody></table></div>
+        <div class="panel">
+          <h3>Create a campaign (draft)</h3>
+          <form id="campaign-form">
+            <label for="c-title">Title</label>
+            <input type="text" id="c-title" maxlength="200" required placeholder="Campaign title">
+            <label for="c-platform">Platform</label>
+            <input type="text" id="c-platform" maxlength="60" required placeholder="e.g. Instagram Reels">
+            <label for="c-objective">Objective</label>
+            <select id="c-objective">
+              <option value="click">click</option>
+              <option value="signup">signup</option>
+              <option value="code">code</option>
+              <option value="api_post">api_post</option>
+            </select>
+            <label for="c-brief">Brief</label>
+            <textarea id="c-brief" rows="3" placeholder="What promoters should post"></textarea>
+            <label for="c-budget">Budget (kobo)</label>
+            <input type="number" id="c-budget" min="1" step="1" required placeholder="e.g. 5000000 = ₦50,000">
+            <label for="c-price">Price per outcome (kobo)</label>
+            <input type="number" id="c-price" min="1" step="1" required>
+            <label for="c-share">Promoter share (basis points)</label>
+            <input type="number" id="c-share" min="0" max="10000" step="1" required placeholder="e.g. 7000 = 70%">
+            <label for="c-floor">Margin floor (basis points)</label>
+            <input type="number" id="c-floor" min="0" max="10000" step="1" required placeholder="e.g. 1500 = 15%">
+            <label for="c-reserve">Fraud reserve (basis points, optional)</label>
+            <input type="number" id="c-reserve" min="0" max="10000" step="1" placeholder="default 500">
+            <label for="c-hold">Hold hours (48–72)</label>
+            <input type="number" id="c-hold" min="48" max="72" step="1" placeholder="default 72">
+            <label for="c-pause">Auto-pause (50–100% of budget)</label>
+            <input type="number" id="c-pause" min="50" max="100" step="1" placeholder="default 90">
+            <p class="form-status" id="campaign-status" role="status"></p>
+            <button type="submit" class="btn primary">Create campaign</button>
+          </form>
+          <p class="fine">A campaign is created in draft. Going live requires escrow funding enforced by the database.</p>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="pane-settings" class="pane" role="tabpanel" hidden>
+        <div id="settings-status" class="form-status" role="status"></div>
+        <p><button id="settings-load" class="btn ghost" type="button">Load settings</button></p>
+        <div class="table-wrap"><table id="settings-table"><thead><tr><th>Key</th><th>Value</th><th>Type</th><th>Group</th><th></th></tr></thead><tbody id="settings-body"></tbody></table></div>
+      </section>
+
+      <!-- Audit -->
+      <section id="pane-audit" class="pane" role="tabpanel" hidden>
+        <div id="audit-status" class="form-status" role="status"></div>
+        <div class="table-wrap"><table class="queue-table" id="audit-table"><thead><tr><th>When</th><th>Actor role</th><th>Action</th><th>Target</th><th>Before → After</th></tr></thead><tbody id="audit-body"></tbody></table></div>
+        <p>
+          <button id="audit-prev" class="theme-btn" type="button" disabled>Previous</button>
+          <button id="audit-next" class="theme-btn" type="button">Older</button>
+          <span class="fine" id="audit-position"></span>
+        </p>
+      </section>
+    </section>
+  </section>
+  </main>
+
+  <script src="/auth.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>

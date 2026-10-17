@@ -371,32 +371,35 @@
     <p class="copy">© 2026 Promota. All rights reserved. Earnings depend on verified task outcomes and are not guaranteed.</p>
   </footer>
 
-  <!-- Login/Signup Modal -->
+  <!-- Sign in / Sign up modal — passwordless phone OTP -->
   <div id="modal" class="modal" hidden>
     <div class="modal-card" id="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <button id="close-modal" class="btn ghost" type="button" aria-label="Close dialog">Close</button>
       <div>
-        <h3 id="modal-title">Login</h3>
-        <p id="modal-subtitle">Enter your credentials</p>
+        <h3 id="modal-title">Sign in</h3>
+        <p id="modal-subtitle">Enter your phone number to continue</p>
       </div>
       <form id="auth-form">
-        <div>
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required placeholder="name@domain.com">
+        <div id="auth-phone-step">
+          <label for="auth-phone">Phone number</label>
+          <input type="tel" id="auth-phone" name="phone" required
+                 placeholder="0803 000 0000" autocomplete="tel" inputmode="tel">
+          <p class="fine">No password. We send a one-time code by SMS.</p>
         </div>
-        <div>
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" required placeholder="Password">
+        <div id="auth-otp-step" hidden>
+          <label for="auth-otp">One-time code</label>
+          <input type="text" id="auth-otp" name="otp" required
+                 placeholder="4-digit code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+          <p class="fine" id="auth-otp-hint">Code sent to your phone.</p>
         </div>
-        <button type="submit" class="btn gold">Sign In</button>
+        <p class="form-status" id="auth-status" role="status"></p>
+        <button type="submit" class="btn gold" id="auth-submit">Send code</button>
+        <button type="button" class="btn ghost" id="auth-back" hidden>Change number</button>
       </form>
-      <div>
-        <p>Don't have an account?</p>
-        <button id="switch-to-signup" class="btn ghost" type="button">Signup</button>
-      </div>
     </div>
   </div>
 
+  <script src="/auth.js"></script>
   <script src="/landing.js"></script>
 </body>
 </html>
