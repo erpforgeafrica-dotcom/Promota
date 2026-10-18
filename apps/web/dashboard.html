@@ -8,6 +8,9 @@
   <title>Dashboard — Promota Promoters</title>
   <meta name="description" content="Your Promota promoter dashboard: grab tasks, track earnings, redeem data or cash, and watch your referrals qualify.">
   <script src="/theme-boot.js"></script>
+  <link rel="icon" type="image/svg+xml" href="/assets/identity/favicon.svg">
+  <link rel="icon" type="image/png" sizes="180x180" href="/assets/identity/favicon-180.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/identity/favicon-180.png">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -16,6 +19,7 @@
   <nav class="nav" aria-label="Primary">
     <div class="nav-inner">
       <a href="/" class="brand" aria-label="Promota home">
+        <img class="brand-logo" src="/assets/identity/mark.svg" alt="" aria-hidden="true" width="30" height="30">
         <span class="brand-name"><span class="ow">Pro</span><span class="works">mota</span></span>
       </a>
       <div class="nav-cta">
@@ -47,6 +51,14 @@
         <div class="stat"><span class="stat-num" id="stat-cash">–</span><span class="stat-label">Cash payouts</span></div>
       </div>
       <p class="fine" id="next-level" hidden></p>
+
+      <section id="checkin" class="panel" hidden>
+        <h2>Daily check-in</h2>
+        <p class="fine" id="checkin-status"></p>
+        <div class="checkin-grid" id="checkin-grid" role="img" aria-label="Days checked in this month"></div>
+        <button id="checkin-btn" class="btn primary" type="button">Check in</button>
+        <p class="fine">Every Lagos day counts once. Streaks pay bonus points at 7 and 30 days; a month with zero missed days pays a perfect-month bonus and queues a free data bundle.</p>
+      </section>
 
       <div class="tabs" role="tablist" aria-label="Dashboard sections">
         <button class="tab active" role="tab" aria-checked="true" data-pane="available" type="button">Available tasks</button>
@@ -114,6 +126,7 @@
     </section>
   </footer>
 
+  <script src="/feedback.js"></script>
   <script src="/auth.js"></script>
   <script src="/dashboard.js"></script>
 </body>

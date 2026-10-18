@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 480" role="img" aria-label="OwoWorks banner">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 480" role="img" aria-label="Promota banner">
   <rect width="1600" height="480" fill="#f4f7f2"/>
   <circle cx="200" cy="240" r="110" fill="none" stroke="#008751" stroke-width="26" opacity="0.35"/>
   <circle cx="200" cy="240" r="72" fill="none" stroke="#a98a3c" stroke-width="16"/>
   <path d="M252 118 L282 88 L312 118 M282 88 L282 158" fill="none" stroke="#6d5518" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="380" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="120" font-weight="600" fill="#101915">Owo<tspan fill="#046a41">Works</tspan></text>
+  <text x="380" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="120" font-weight="600" fill="#101915">Pro<tspan fill="#046a41">mota</tspan></text>
   <text x="384" y="330" font-family="'Segoe UI', system-ui, sans-serif" font-size="44" fill="#4d5a51">Money that works as hard as you do.</text>
 </svg>

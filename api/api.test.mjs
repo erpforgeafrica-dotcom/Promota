@@ -123,6 +123,8 @@ const routes = await import('../api/routes.mjs');
     'GET /api/v1/promoter/earnings',
     'GET /api/v1/promoter/referrals',
     'GET /api/v1/promoter/payouts',
+    'POST /api/v1/checkin',
+    'GET /api/v1/checkin',
   ];
   for (const r of expected) {
     check(`route ${r} is registered`, typeof routes.routes[r] === 'function');
@@ -163,6 +165,10 @@ const routes = await import('../api/routes.mjs');
   check('GET /api/referrals refuses without a session', refsRes.status === 401);
   const redeemRes = await routes.redeem(fakeReq({ kind: 'data', points: 500, network: 'MTN' }));
   check('POST /api/redeem refuses without a session', redeemRes.status === 401);
+  const checkinRes = await routes.routes['POST /api/v1/checkin'](fakeReq({}));
+  check('POST /api/v1/checkin refuses without a session', checkinRes.status === 401);
+  const checkinStatusRes = await routes.routes['GET /api/v1/checkin'](fakeReq({}));
+  check('GET /api/v1/checkin refuses without a session', checkinStatusRes.status === 401);
 
   // the webhook must refuse a bad signature before parsing anything
   const hookRes = await routes.flutterwaveWebhook(
@@ -238,6 +244,7 @@ const routes = await import('../api/routes.mjs');
   for (const t of [
     'lead.captured', 'points.awarded', 'referral.qualified', 'redemption.requested',
     'task.auto_approved', 'task.approved', 'task.claimed', 'referral_network.awarded',
+    'login.perfect_month',
   ]) {
     check(`worker handles outbox topic "${t}"`, typeof worker.handlers[t] === 'function');
   }

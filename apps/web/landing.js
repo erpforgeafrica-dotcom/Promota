@@ -125,7 +125,7 @@
     if (pendingPinId) {
       /* ---- OTP step ---- */
       var pin = otpInput ? otpInput.value.trim() : '';
-      if (!/^\d{4,8}$/.test(pin)) { say('Enter the code from the SMS.', true); return; }
+      if (!/^\d{4,8}$/.test(pin)) { say('Enter the code from the SMS.', true); FB && FB.err('Enter the code from the SMS.'); return; }
       busy = true;
       if (submitBtn) submitBtn.disabled = true;
       say('Checking the code…');
@@ -140,6 +140,7 @@
         var msg = (r.body && r.body.error) || 'That code is not valid.';
         if (r.status === 503) msg = 'SMS service is not configured on the server yet.';
         say(msg, true);
+        FB && FB.err(msg);
         if (otpInput) otpInput.focus();
       });
       return;
@@ -149,6 +150,7 @@
     var normalised = window.PromotaAuth.normalisePhone(phoneInput ? phoneInput.value : '');
     if (!normalised) {
       say('Use a Nigerian number, for example 0803 000 0000 or +234 803 000 0000.', true);
+      FB && FB.err('Use a valid Nigerian number, for example 0803 000 0000.');
       if (phoneInput) phoneInput.focus();
       return;
     }
@@ -162,6 +164,7 @@
         busy = false;
         if (submitBtn) submitBtn.disabled = false;
         showOtpStep(r.body.network);
+        FB && FB.ok('Code sent to ' + pendingPhone + '. Check your SMS.');
         return;
       }
       busy = false;
@@ -169,6 +172,7 @@
       var msg = (r.body && r.body.error) || 'Could not send the code. Please try again.';
       if (r.status === 503) msg = 'SMS service is not configured on the server yet.';
       say(msg, true);
+      FB && FB.err(msg);
       if (phoneInput) phoneInput.focus();
     });
   });
@@ -234,4 +238,6 @@
       if (navTheme) navTheme.setAttribute('aria-pressed', next === 'light' ? 'true' : 'false');
     });
   }
+
+  FB && FB.ready();
 })();

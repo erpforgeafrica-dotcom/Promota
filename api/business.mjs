@@ -32,8 +32,10 @@ export const CAMPAIGN_ACTIONS = [
   'repost', 'share', 'view', 'join_channel', 'review',
 ];
 
-/** Campaign objective: the business intent behind the campaign. */
-const OBJECTIVES = ['click', 'signup', 'code', 'api_post'];
+/** Campaign objective: the business intent behind the campaign. 'repost'
+ *  pays through the rated-repost flow: a reviewer scores the submission
+ *  1-5 and a rating below repost.min_rating_full scales the payout. */
+const OBJECTIVES = ['click', 'signup', 'code', 'api_post', 'repost'];
 
 const PLATFORMS = ['whatsapp', 'telegram', 'x', 'instagram', 'tiktok', 'facebook', 'youtube', 'other'];
 

@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="OwoWorks — Naija promotes the world">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="Promota — Naija promotes the world">
   <rect width="1200" height="630" fill="#04120b"/>
   <rect x="80" y="150" width="170" height="170" rx="42" fill="#008751"/>
   <circle cx="165" cy="238" r="40" fill="none" stroke="#d9b263" stroke-width="10"/>
   <path d="M196 178 L214 160 L232 178 M214 160 L214 196" fill="none" stroke="#f4dc9d" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="290" y="235" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="600" fill="#eef3ee">Owo<tspan fill="#d9b263">Works</tspan></text>
+  <text x="290" y="235" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="600" fill="#eef3ee">Pro<tspan fill="#d9b263">mota</tspan></text>
   <text x="292" y="300" font-family="'Segoe UI', system-ui, sans-serif" font-size="40" fill="#93a29a">Naija promotes the world — and gets paid.</text>
   <rect x="292" y="350" width="560" height="72" rx="8" fill="#008751"/>
   <text x="324" y="398" font-family="'Segoe UI', system-ui, sans-serif" font-size="34" font-weight="600" fill="#ffffff">Checked work · Data first · Cash as you grow</text>

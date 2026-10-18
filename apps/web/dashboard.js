@@ -71,6 +71,7 @@
       gate.hidden = false;
     }
     if (app) app.hidden = true;
+    FB && FB.ready();
   }
 
   /* ---------- rendering ---------- */
@@ -150,12 +151,14 @@
         Auth.api('/api/tasks/' + encodeURIComponent(id) + '/claim', { method: 'POST' }).then(function (r) {
           if (r.status === 200) {
             if (box) { box.textContent = 'Task claimed — finish it under "my tasks".'; box.className = 'form-status ok'; }
+            FB && FB.ok('Task claimed — finish it under My tasks.');
             loadTasks();
             loadMine();
             return;
           }
           if (btn) btn.disabled = false;
           if (box) { box.textContent = (r.body && r.body.error) || 'Could not claim the task.'; box.className = 'form-status error'; }
+          FB && FB.err((r.body && r.body.error) || 'Could not claim the task.');
         });
       });
     });
@@ -202,6 +205,7 @@
         if (!/^https?:\/\//i.test(url)) {
           var b = document.getElementById('mine-status');
           if (b) { b.textContent = 'Paste the full link of your post (https://…).'; b.className = 'form-status error'; }
+          FB && FB.err('Paste the full link of your post (https://…).');
           return;
         }
         var body = { proofUrl: url };
@@ -219,8 +223,9 @@
             loadMine();
             var b = document.getElementById('mine-status');
             var okMsg = r.status === 200 && b;
-            if (okMsg) { b.textContent = (r.body && r.body.nextStep) || 'Proof submitted. Points land after verification.'; b.className = 'form-status ok'; return; }
+            if (okMsg) { b.textContent = (r.body && r.body.nextStep) || 'Proof submitted. Points land after verification.'; b.className = 'form-status ok'; FB && FB.ok('Proof submitted. Points land after verification.'); return; }
             if (b) { b.textContent = (r.body && r.body.error) || 'Could not submit the proof.'; b.className = 'form-status error'; }
+            FB && FB.err((r.body && r.body.error) || 'Could not submit the proof.');
             if (btn) btn.disabled = false;
           });
       });
@@ -310,6 +315,7 @@
         if (r.status === 202 && stat) {
           stat.textContent = 'Redemption queued — fulfilment happens in the background.';
           stat.className = 'form-status ok';
+          FB && FB.ok('Redemption queued — fulfilment happens in the background.');
           loadMoney();
           loadMe();
           return;
@@ -320,6 +326,7 @@
           if (r.status === 409) msg = (r.body && r.body.error) || 'You do not have that many points.';
           stat.textContent = msg;
           stat.className = 'form-status error';
+          FB && FB.err(msg);
         }
       });
     });
@@ -370,6 +377,72 @@
     });
   }
 
+  /* ---------- daily check-in ---------- */
+
+  function renderCheckin(st) {
+    var panel = document.getElementById('checkin');
+    if (!panel) return;
+    panel.hidden = false;
+
+    var grid = document.getElementById('checkin-grid');
+    var btn = document.getElementById('checkin-btn');
+    var stEl = document.getElementById('checkin-status');
+    var lDay = String(st.lagosDay || '');
+    var checked = {};
+    var days = Array.isArray(st.checkedThisMonth) ? st.checkedThisMonth : [];
+    for (var i = 0; i < days.length; i++) checked[days[i]] = true;
+    var dayNum = Number(lDay.slice(8)) || 0;
+    var now = new Date();
+    var dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    if (grid) {
+      var html = '';
+      for (var d = 1; d <= dim; d++) {
+        var key = lDay.slice(0, 8) + String(d).padStart(2, '0');
+        var cls = 'dot';
+        if (checked[key]) cls += ' hit';
+        else if (d <= dayNum) cls += ' miss';
+        else cls += ' off';
+        html += '<span class="' + cls + '" title="' + key + '" aria-hidden="true"></span>';
+      }
+      grid.innerHTML = html;
+      grid.setAttribute('data-dots', String(dim));
+    }
+
+    if (st.checkedInToday) {
+      if (btn) { btn.disabled = true; btn.textContent = 'Checked in today'; }
+      if (stEl) stEl.textContent = 'Streak: ' + (Number(st.streak) || 0) + ' day(s). Miss zero days for the rest of the month to keep a perfect month.';
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Check in'; }
+      if (stEl) stEl.textContent = 'No check-in yet today. Show up daily for points; streaks pay milestone bonuses.';
+    }
+  }
+
+  function loadCheckin() {
+    return Auth.api('/api/v1/checkin').then(function (r) {
+      if (r.status === 200 && r.body) renderCheckin(r.body);
+    }).catch(function () { /* the boot gate surfaces real failures */ });
+  }
+
+  var checkinBtn = document.getElementById('checkin-btn');
+  if (checkinBtn) checkinBtn.addEventListener('click', function () {
+    checkinBtn.disabled = true;
+    Auth.api('/api/v1/checkin', { method: 'POST' }).then(function (r) {
+      var body = r.body || {};
+      if (r.status === 200 && body.already) {
+        FB && FB.info('Today is already checked in.');
+      } else if ((r.status === 200 || r.status === 201) && !body.already) {
+        var extra = body.points ? body.points + ' points earned.' : 'Points earned.';
+        if (body.streak) extra += ' Streak: ' + body.streak + ' day(s).';
+        FB && FB.ok('Checked in. ' + extra);
+      } else {
+        FB && FB.err(body.error || 'Check-in refused. Try again shortly.');
+      }
+      loadCheckin();
+      loadMe();
+    });
+  });
+
   var signoutBtn = document.getElementById('signout');
   if (signoutBtn) signoutBtn.addEventListener('click', function () {
     Auth.signOut();
@@ -391,7 +464,8 @@
       loadTasks(),
       loadMine(),
       loadMoney(),
-      loadReferrals()
+      loadReferrals(),
+      loadCheckin()
     ]);
-  });
+  }).then(function () { FB && FB.ready(); }, function () { FB && FB.ready(); });
 })();

@@ -167,8 +167,10 @@
       });
       queueBody.innerHTML = html;
       if (queueStatus) queueStatus.textContent = tasks.length + ' waiting.';
+      FB && FB.info(tasks.length + ' task' + (tasks.length === 1 ? '' : 's') + ' waiting for review.');
     }).catch(function () {
       if (queueStatus) queueStatus.textContent = 'The queue could not load. Check the connection and retry.';
+      FB && FB.err('The queue could not load. Check the connection and retry.');
     });
   }
 
@@ -196,16 +198,20 @@
     api(path, { method: 'POST', body: JSON.stringify(payload) }).then(function (res) {
       if (res.status === 401) {
         if (queueStatus) queueStatus.textContent = 'That token is not a signed-in reviewer. Save a fresh token.';
+        FB && FB.err('That token is not a signed-in reviewer. Save a fresh token.');
         return;
       }
       if (res.status !== 200) {
         if (queueStatus) queueStatus.textContent = 'Decision refused: ' + ((res.body && res.body.error) || 'unknown error');
+        FB && FB.err('Decision refused: ' + ((res.body && res.body.error) || 'unknown error'));
         return;
       }
+      FB && FB.ok(kind === 'reject' ? 'Task rejected — the reason is on record.' : 'Task approved — points award through the outbox.');
       loadQueue();
       loadAudit();
     }).catch(function () {
       if (queueStatus) queueStatus.textContent = 'The decision could not save. Retry.';
+      FB && FB.err('The decision could not save. Retry.');
     });
   }
 
@@ -263,6 +269,7 @@
   if (auditRefresh) auditRefresh.addEventListener('click', loadAudit);
 
   /* ---------- boot ---------- */
+  FB && FB.ready();
   if (getToken()) {
     loadQueue();
     loadAudit();

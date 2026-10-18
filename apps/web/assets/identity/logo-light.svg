@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" role="img" aria-label="OwoWorks logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" role="img" aria-label="Promota logo">
   <rect x="4" y="8" width="64" height="64" rx="16" fill="#008751"/>
   <circle cx="36" cy="42" r="15" fill="none" stroke="#d9b263" stroke-width="4"/>
   <path d="M44 26 L50 20 L56 26 M50 20 L50 32" fill="none" stroke="#f4dc9d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="80" y="52" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="600" fill="#101915">Owo<tspan fill="#046a41">Works</tspan></text>
+  <text x="80" y="52" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="600" fill="#101915">Pro<tspan fill="#046a41">mota</tspan></text>
 </svg>

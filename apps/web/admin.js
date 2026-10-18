@@ -79,6 +79,7 @@
     if (p) p.textContent = copy;
     if (gate) gate.hidden = false;
     if (app) app.hidden = true;
+    FB && FB.ready();
   }
 
   /* ---------------- stats ---------------- */
@@ -151,8 +152,8 @@
         b.disabled = true;
         Auth.api('/api/admin/users/' + encodeURIComponent(id) + '/suspend', { method: 'POST', body: { reason: reason.trim() } })
           .then(function (r) {
-            if (r.status === 200) { say('users-status', 'User suspended.', false); loadUsers(); }
-            else { say('users-status', (r.body && r.body.error) || 'Suspend refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('users-status', 'User suspended.', false); FB && FB.ok('User suspended.'); loadUsers(); }
+            else { say('users-status', (r.body && r.body.error) || 'Suspend refused.', true); FB && FB.err((r.body && r.body.error) || 'Suspend refused.'); b.disabled = false; }
           });
       });
     });
@@ -162,8 +163,8 @@
         b.disabled = true;
         Auth.api('/api/admin/users/' + encodeURIComponent(id) + '/reinstate', { method: 'POST', body: {} })
           .then(function (r) {
-            if (r.status === 200) { say('users-status', 'User reinstated.', false); loadUsers(); }
-            else { say('users-status', (r.body && r.body.error) || 'Reinstate refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('users-status', 'User reinstated.', false); FB && FB.ok('User reinstated.'); loadUsers(); }
+            else { say('users-status', (r.body && r.body.error) || 'Reinstate refused.', true); FB && FB.err((r.body && r.body.error) || 'Reinstate refused.'); b.disabled = false; }
           });
       });
     });
@@ -240,17 +241,23 @@
       b.addEventListener('click', function () {
         var id = b.getAttribute('data-approve');
         var viewsRaw = window.prompt('Views count shown by the proof (optional — leave empty to keep the evidence values):', '');
+        var ratingRaw = window.prompt('Rate this submission 1-5 (optional — only repost campaigns with ratings below 4 scale the payout):', '');
         var body = {};
         if (viewsRaw && viewsRaw.trim() !== '') {
           var v = Number(viewsRaw.trim());
           if (!(Number.isInteger(v) && v >= 0)) { say('review-status', 'Views must be a non-negative whole number.', true); return; }
           body.views = v;
         }
+        if (ratingRaw && ratingRaw.trim() !== '') {
+          var rr = Number(ratingRaw.trim());
+          if (!(Number.isInteger(rr) && rr >= 1 && rr <= 5)) { say('review-status', 'Rating must be a whole number between 1 and 5.', true); return; }
+          body.rating = rr;
+        }
         b.disabled = true;
         Auth.api('/api/admin/tasks/' + encodeURIComponent(id) + '/approve', { method: 'POST', body: body })
           .then(function (r) {
-            if (r.status === 200) { say('review-status', 'Task approved — points award through the outbox.', false); loadReview(); }
-            else { say('review-status', (r.body && r.body.error) || 'Approve refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('review-status', 'Task approved — points award through the outbox.', false); FB && FB.ok('Task approved — points award through the outbox.'); loadReview(); }
+            else { say('review-status', (r.body && r.body.error) || 'Approve refused.', true); FB && FB.err((r.body && r.body.error) || 'Approve refused.'); b.disabled = false; }
           });
       });
     });
@@ -286,8 +293,8 @@
         b.disabled = true;
         Auth.api('/api/admin/tasks/' + encodeURIComponent(id) + '/reject', { method: 'POST', body: { reason: reason.trim() } })
           .then(function (r) {
-            if (r.status === 200) { say('review-status', 'Task rejected.', false); loadReview(); }
-            else { say('review-status', (r.body && r.body.error) || 'Reject refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('review-status', 'Task rejected.', false); FB && FB.ok('Task rejected.'); loadReview(); }
+            else { say('review-status', (r.body && r.body.error) || 'Reject refused.', true); FB && FB.err((r.body && r.body.error) || 'Reject refused.'); b.disabled = false; }
           });
       });
     });
@@ -354,8 +361,8 @@
         b.disabled = true;
         Auth.api('/api/admin/campaigns/' + encodeURIComponent(id) + '/fund', { method: 'POST', body: { amountMinor: amount } })
           .then(function (r) {
-            if (r.status === 200) { say('campaigns-status', 'Escrow funded: ' + naira(amount) + '.', false); loadCampaigns(); }
-            else { say('campaigns-status', (r.body && r.body.error) || 'Funding refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('campaigns-status', 'Escrow funded: ' + naira(amount) + '.', false); FB && FB.ok('Escrow funded: ' + naira(amount) + '.'); loadCampaigns(); }
+            else { say('campaigns-status', (r.body && r.body.error) || 'Funding refused.', true); FB && FB.err((r.body && r.body.error) || 'Funding refused.'); b.disabled = false; }
           });
       });
     });
@@ -369,11 +376,11 @@
         b.disabled = true;
         Auth.api('/api/admin/campaigns/' + encodeURIComponent(id) + '/fund', { method: 'POST', body: { amountMinor: cover, note: 'confirm preflight' } })
           .then(function (r) {
-            if (r.status !== 200) { say('campaigns-status', (r.body && r.body.error) || 'Preflight funding refused.', true); b.disabled = false; return; }
+            if (r.status !== 200) { say('campaigns-status', (r.body && r.body.error) || 'Preflight funding refused.', true); FB && FB.err((r.body && r.body.error) || 'Preflight funding refused.'); b.disabled = false; return; }
             return Auth.api('/api/admin/campaigns/' + encodeURIComponent(id) + '/confirm', { method: 'POST', body: {} })
               .then(function (r2) {
-                if (r2.status === 200) { say('campaigns-status', 'Campaign is live — tasks are claimable.', false); loadCampaigns(); }
-                else { say('campaigns-status', (r2.body && r2.body.error) || 'Confirm refused.', true); b.disabled = false; }
+                if (r2.status === 200) { say('campaigns-status', 'Campaign is live — tasks are claimable.', false); FB && FB.ok('Campaign is live — tasks are claimable.'); loadCampaigns(); }
+                else { say('campaigns-status', (r2.body && r2.body.error) || 'Confirm refused.', true); FB && FB.err((r2.body && r2.body.error) || 'Confirm refused.'); b.disabled = false; }
               });
           });
       });
@@ -408,11 +415,12 @@
       if (btn) btn.disabled = false;
       if (r.status === 201) {
         if (stat) { stat.textContent = 'Campaign created in draft.'; stat.className = 'form-status ok'; }
+        FB && FB.ok('Campaign created in draft.');
         campaignForm.reset();
         loadCampaigns();
         return;
       }
-      if (stat) { stat.textContent = (r.body && r.body.error) || 'Campaign refused.'; stat.className = 'form-status error'; }
+      if (stat) { stat.textContent = (r.body && r.body.error) || 'Campaign refused.'; stat.className = 'form-status error'; FB && FB.err((r.body && r.body.error) || 'Campaign refused.'); }
     });
   });
 
@@ -456,8 +464,8 @@
             } else value = raw;
             b.disabled = true;
             Auth.api('/api/admin/settings', { method: 'POST', body: { key: key, value: value } }).then(function (r2) {
-              if (r2.status === 200) { say('settings-status', key + ' saved.', false); }
-              else { say('settings-status', key + ': ' + ((r2.body && r2.body.error) || 'update refused.'), true); }
+              if (r2.status === 200) { say('settings-status', key + ' saved.', false); FB && FB.ok(key + ' saved.'); }
+              else { say('settings-status', key + ': ' + ((r2.body && r2.body.error) || 'update refused.'), true); FB && FB.err(key + ': ' + ((r2.body && r2.body.error) || 'update refused.')); }
               b.disabled = false;
             });
           });
@@ -499,8 +507,8 @@
         b.disabled = true;
         Auth.api('/api/admin/campaign/owners/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: { verdict: verdict, note: note.trim() } })
           .then(function (r) {
-            if (r.status === 200) { say('owners-status', 'Owner ' + verdict + '.', false); loadOwners(); }
-            else { say('owners-status', (r.body && r.body.error) || 'Update refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('owners-status', 'Owner ' + verdict + '.', false); FB && FB.ok('Owner ' + verdict + '.'); loadOwners(); }
+            else { say('owners-status', (r.body && r.body.error) || 'Update refused.', true); FB && FB.err((r.body && r.body.error) || 'Update refused.'); b.disabled = false; }
           });
       });
     });
@@ -544,8 +552,8 @@
         b.disabled = true;
         Auth.api('/api/admin/kyc/' + encodeURIComponent(id) + '/verify', { method: 'POST', body: { tier: tier } })
           .then(function (r) {
-            if (r.status === 200) { say('kyc-status', 'Tier set to ' + tier + '.', false); loadKyc(); }
-            else { say('kyc-status', (r.body && r.body.error) || 'Update refused.', true); b.disabled = false; }
+            if (r.status === 200) { say('kyc-status', 'Tier set to ' + tier + '.', false); FB && FB.ok('KYC tier set to ' + tier + '.'); loadKyc(); }
+            else { say('kyc-status', (r.body && r.body.error) || 'Update refused.', true); FB && FB.err((r.body && r.body.error) || 'Update refused.'); b.disabled = false; }
           });
       });
     });
@@ -712,6 +720,7 @@
   if (app) app.hidden = false;
 
   Promise.all([loadStats(), loadUsers(), loadReview(), loadCampaigns(), loadOwners(), loadKyc()]).then(function () {
+    FB && FB.ready();
     return Auth.api('/api/me').then(function (r) {
       if (r.status === 200 && r.body) {
         var p = r.body.profile || {};
@@ -719,5 +728,5 @@
         if (dashLink) dashLink.hidden = false;
       }
     });
-  });
+  }, function () { FB && FB.ready(); });
 })();

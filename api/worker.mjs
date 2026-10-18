@@ -133,6 +133,39 @@ const handlers = {
   'task.auto_approved': async (p) => ({ delivered: true, note: `task ${p.task_id} auto-approved` }),
 
   /**
+   * Perfect-month login reward. The POINTS were already paid inside
+   * checkin(); this event only carries the free data bundle. When the
+   * aggregator is not configured the reward is logged as skipped rather
+   * than retried forever — the month's points stay paid, and the note is
+   * the audit trail.
+   */
+  'login.perfect_month': async (p) => {
+    const mb = Number(p.mb) || 0;
+    if (!mb) return { delivered: true, note: `no data reward configured for ${p.month}; points already paid` };
+    const st = data.status();
+    if (!st.ready) {
+      return { delivered: true, note: `data aggregator not configured (${st.reason}); ${p.month} reward logged only` };
+    }
+    // Never invent a plan: only a catalogue entry that matches the reward
+    // size can ship. Until one exists the reward stays a ledger fact.
+    const plan = data.plans().find(pl => Number(pl.mb) === mb);
+    if (!plan) return { delivered: true, note: `no catalogue plan for ${mb}MB; ${p.month} reward logged only` };
+    const profile = await sb.select('profiles', `id=eq.${p.profile_id}&select=phone_e164,network`);
+    const phone = profile?.[0]?.phone_e164;
+    if (!phone) return { delivered: true, note: `no phone on file for the ${p.month} data reward; logged only` };
+    const r = await data.deliver({
+      network: profile?.[0]?.network || plan.network || 'MTN',
+      phone,
+      planCode: plan.code,
+      reference: `login:${p.month}:${p.profile_id}`,
+    });
+    if (!r.ok) {
+      return { delivered: r.retryable !== false, note: `delivery refused: ${String(r.error).slice(0, 200)}` };
+    }
+    return { delivered: true, note: `${p.month} data reward (${mb}MB) delivered as ${plan.name || plan.code}` };
+  },
+
+  /**
    * Manual admin approval: award through the SAME idempotent SQL path the
    * sweeper uses (referral slice + views bonus included). Retries are safe
    * because every ledger write behind these functions carries an idem key.

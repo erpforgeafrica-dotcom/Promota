@@ -33,7 +33,7 @@ const USER_STATES = ['pending', 'active', 'suspended', 'banned'];
 const APP_ROLES = ['promoter', 'business', 'partner', 'support', 'finance', 'admin', 'owner'];
 const CAMPAIGN_STATES = ['draft', 'review', 'live', 'paused', 'exhausted', 'settling', 'settled', 'cancelled'];
 const TASK_STATES = ['draft', 'assigned', 'submitted', 'checking', 'held', 'approved', 'rejected', 'paid', 'expired', 'cancelled'];
-const OBJECTIVES = ['click', 'signup', 'code', 'api_post'];
+const OBJECTIVES = ['click', 'signup', 'code', 'api_post', 'repost'];
 
 async function adminPost(path, body) {
   if (!AUTH_URL || !SERVICE_KEY) throw new Error('Supabase admin credentials are not configured');
@@ -438,6 +438,13 @@ export async function listTasksAdmin(req) {
  * POST /api/admin/tasks/:id/approve
  * Only a submitted/checking/held task can be approved; the state machine in
  * the database refuses anything else, and we translate that to a 409.
+ *
+ * Rated repost: the reviewer may score the submission 1-5. For campaigns
+ * whose objective is 'repost', a score below repost.min_rating_full scales
+ * the task's payout (points_awarded) by repost.low_rating_factor BEFORE the
+ * outbox award runs â€” the worker then pays the scaled amount through the
+ * same idempotent SQL path as every other approval. Full ratings stay
+ * untouched, and admin owners can retune both numbers in the Settings pane.
  */
 export async function approveTask(req, params) {
   const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
@@ -447,7 +454,7 @@ export async function approveTask(req, params) {
   const id = String(params?.id || '');
   if (!UUID_RE.test(id)) return fail('a task id is required');
 
-  const [task] = await sb.select('tasks', `id=eq.${id}&select=id,state`);
+  const [task] = await sb.select('tasks', `id=eq.${id}&select=id,state,campaign_id`);
   if (!task) return fail('task not found', 404);
   if (!['submitted', 'checking', 'held'].includes(task.state)) {
     return fail(`a task in state "${task.state}" cannot be approved`, 409);
@@ -463,18 +470,58 @@ export async function approveTask(req, params) {
     }
   }
 
+  // Rated repost score (optional): a whole number 1-5 or nothing.
+  const ratingIn = req.body?.rating;
+  let rating = null;
+  if (ratingIn != null && ratingIn !== '') {
+    rating = Number(ratingIn);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return fail('rating must be a whole number between 1 and 5');
+    }
+  }
+
+  // Scale the payout for a low-rated repost BEFORE any award event exists,
+  // so the ledger never records an amount that is later contradicted.
+  let scaledFrom = null;
+  let scaledTo = null;
+  if (rating != null && task.campaign_id) {
+    const [campaign] = await sb.select('campaigns', `id=eq.${task.campaign_id}&select=objective`);
+    if (campaign?.objective === 'repost') {
+      const minFull = await readSetting('repost.min_rating_full', 4);
+      if (Number.isInteger(minFull) && rating < minFull) {
+        const factorRaw = await readSetting('repost.low_rating_factor', 0.5);
+        const factor = Number(factorRaw);
+        if (Number.isFinite(factor) && factor > 0 && factor < 1) {
+          const [cur] = await sb.select('tasks', `id=eq.${id}&select=points_awarded`);
+          const base = Number(cur?.points_awarded);
+          if (Number.isInteger(base) && base > 0) {
+            const payout = Math.max(1, Math.round(base * factor));
+            if (payout < base) {
+              await sb.update('tasks', `id=eq.${id}`, { points_awarded: payout });
+              scaledFrom = base;
+              scaledTo = payout;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const patch = {
+    state: 'approved',
+    reviewed_by: auth.sub,
+    verdict: 'approved',
+    verdict_source: 'admin_review',
+    updated_at: new Date().toISOString(),
+  };
+  if (rating != null) patch.rating = rating;
+
   let updated;
   try {
     updated = await sb.update(
       'tasks',
       `id=eq.${id}&state=in.(submitted,checking,held)`,
-      {
-        state: 'approved',
-        reviewed_by: auth.sub,
-        verdict: 'approved',
-        verdict_source: 'admin_review',
-        updated_at: new Date().toISOString(),
-      }
+      patch
     );
   } catch (e) {
     if (/illegal task transition/i.test(String(e.message))) {
@@ -489,7 +536,9 @@ export async function approveTask(req, params) {
       .catch(() => { /* no proof row (legacy task) â€” nothing to correct */ });
   }
 
-  await audit(auth, 'task.approve', 'task', id, { state: 'approved', views });
+  const after = { state: 'approved', views, rating: rating ?? null };
+  if (scaledFrom != null) after.payoutScaled = `${scaledFrom} â†’ ${scaledTo}`;
+  await audit(auth, 'task.approve', 'task', id, after);
 
   // Points move through the outbox so a crash mid-award is retried, not
   // lost. The worker awards through the SAME idempotent SQL path the
@@ -497,7 +546,15 @@ export async function approveTask(req, params) {
   try { await sb.insert('outbox', { topic: 'task.approved', payload: { task_id: id } }); }
   catch (e) { failingOutbox(auth, id, e); }
 
-  return ok({ approved: true, taskId: id, state: 'approved' });
+  return ok({ approved: true, taskId: id, state: 'approved', rating, payoutScaled: scaledTo != null ? `${scaledFrom}->${scaledTo}` : null });
+}
+
+/** Read one settings row, unwrapping the {"v": value} envelope. */
+async function readSetting(key, fallback = null) {
+  const rows = await sb.select('settings', `key=eq.${key}&select=value`);
+  const raw = rows?.[0]?.value;
+  const v = raw && typeof raw === 'object' && 'v' in raw ? raw.v : raw;
+  return v == null ? fallback : v;
 }
 
 /** Best-effort note when the award outbox insert fails; never blocks approval. */
@@ -784,7 +841,7 @@ const mapOwnerRow = (o) => ({
   submittedAt: o.updated_at ?? o.created_at,
 });
 
-/** GET /api/admin/campaign/owners?state= — owner verification queue. */
+/** GET /api/admin/campaign/owners?state= ï¿½ owner verification queue. */
 export async function listCampaignOwners(req) {
   const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
   if (gate.error) return gate.error;
@@ -872,7 +929,7 @@ export async function fundCampaign(req, params) {
 }
 
 /**
- * POST /api/admin/campaigns/:id/confirm — review ? live.
+ * POST /api/admin/campaigns/:id/confirm ï¿½ review ? live.
  * The database still guards the launch: an unfunded campaign cannot go live
  * (409 with the SQL's own message surfaces in escrow failure).
  */
@@ -924,7 +981,7 @@ export async function confirmCampaign(req, params) {
 
 /* ------------------------------------------------------------- kyc tiers */
 
-/** GET /api/admin/kyc — payout-KYC submission queue (no raw identifiers). */
+/** GET /api/admin/kyc ï¿½ payout-KYC submission queue (no raw identifiers). */
 export async function listKycProfiles(req) {
   const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
   if (gate.error) return gate.error;
@@ -983,7 +1040,7 @@ export async function verifyKycTier(req, params) {
 
 /* ------------------------------------------------------------ evidence */
 
-/** GET /api/admin/tasks/:id/proofs — the in-app authentication evidence. */
+/** GET /api/admin/tasks/:id/proofs ï¿½ the in-app authentication evidence. */
 export async function taskProofs(req, params) {
   const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
   if (gate.error) return gate.error;
@@ -1011,7 +1068,7 @@ export async function taskProofs(req, params) {
 /* ------------------------------------------------------------- plugins */
 
 /**
- * GET /api/admin/plugins — REAL plugin inventory: live probes per provider,
+ * GET /api/admin/plugins ï¿½ REAL plugin inventory: live probes per provider,
  * config presence, and termii balance. No staged "all green" answer.
  */
 export async function pluginsProbe(req) {

@@ -19,6 +19,7 @@ import * as promoter from './promoter.mjs';
 import * as social from './social.mjs';
 import * as business from './business.mjs';
 import * as mining from './mining.mjs';
+import * as checkin from './checkin.mjs';
 
 const ok = (body, status = 200) => ({ status, body });
 const fail = (message, status = 400, extra = {}) => ({ status, body: { error: message, ...extra } });
@@ -698,6 +699,8 @@ const exactRoutes = {
   'GET /api/v1/promoter/earnings': promoter.earnings,
   'GET /api/v1/promoter/referrals': promoter.referrals,
   'GET /api/v1/promoter/payouts': promoter.payouts,
+  'POST /api/v1/checkin': checkin.checkin,
+  'GET /api/v1/checkin': checkin.checkinStatus,
 };
 
 /**
