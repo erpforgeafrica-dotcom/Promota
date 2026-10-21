@@ -24,6 +24,8 @@
       </a>
       <div class="nav-cta">
         <span class="fine" id="whoami" hidden></span>
+        <a class="theme-btn" href="/business.html">Business console</a>
+        <a class="theme-btn" href="/approval-queue.html">Reviewer queue</a>
         <button id="admin-link" class="theme-btn" type="button" hidden>Admin console</button>
         <button id="signout" class="theme-btn" type="button">Sign out</button>
         <button id="themeBtnDash" class="theme-btn" type="button" aria-pressed="false" aria-label="Toggle light and dark theme">Theme</button>
@@ -64,6 +66,7 @@
         <button class="tab active" role="tab" aria-checked="true" data-pane="available" type="button">Available tasks</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="mine" type="button">My tasks</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="money" type="button">Earnings &amp; redemption</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="kyc" type="button">Payout account</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="referrals" type="button">Referrals</button>
       </div>
 
@@ -89,17 +92,24 @@
               <option value="data">Data bundle</option>
               <option value="cash">Cash payout</option>
             </select>
-            <label for="redeem-network">Network</label>
-            <select id="redeem-network" name="network">
-              <option value="MTN">MTN</option>
-              <option value="GLO">GLO</option>
-              <option value="AIRTEL">Airtel</option>
-              <option value="9MOBILE">9mobile</option>
-            </select>
+            <div class="field" id="redeem-network-field">
+              <label for="redeem-network">Network</label>
+              <select id="redeem-network" name="network">
+                <option value="MTN">MTN</option>
+                <option value="GLO">GLO</option>
+                <option value="AIRTEL">Airtel</option>
+                <option value="9MOBILE">9mobile</option>
+              </select>
+            </div>
+            <div class="field" id="redeem-plan-field">
+              <label for="redeem-plan">Data plan</label>
+              <select id="redeem-plan" name="planCode" aria-describedby="redeem-plan-hint"></select>
+              <p class="fine" id="redeem-plan-hint">Pick a data bundle to redeem.</p>
+            </div>
             <label for="redeem-points">Points</label>
             <input type="number" id="redeem-points" name="points" min="1" step="1" required placeholder="Points to spend">
             <p class="form-status" id="redeem-status" role="status"></p>
-            <button type="submit" class="btn primary">Redeem</button>
+            <button type="submit" class="btn primary" id="redeem-submit">Redeem</button>
           </form>
           <p class="fine">Cash payouts are gated by level and KYC. Redemptions are queued and fulfilled in the background.</p>
         </div>
@@ -109,6 +119,40 @@
         <div class="table-wrap"><table class="queue-table" id="redemptions-table"><thead><tr><th>When</th><th>Kind</th><th>Points spent</th><th>Value</th><th>Network</th><th>State</th></tr></thead><tbody id="redemptions-body"></tbody></table></div>
         <h2>Point entries</h2>
         <div class="table-wrap"><table class="queue-table" id="entries-table"><thead><tr><th>When</th><th>Kind</th><th>Points</th><th>Memo</th></tr></thead><tbody id="entries-body"></tbody></table></div>
+      </section>
+
+      <!-- Payout account (KYC) -->
+      <section id="pane-kyc" class="pane" role="tabpanel" hidden>
+        <div class="panel">
+          <h2>Payout account</h2>
+          <p class="fine" id="kyc-state">Loading your payout account…</p>
+          <div id="kyc-note" class="form-status" role="status"></div>
+          <form id="kyc-form">
+            <div class="field">
+              <label for="kyc-legal-name">Legal name</label>
+              <input type="text" id="kyc-legal-name" name="legalName" maxlength="120" required autocomplete="name" placeholder="As it appears at your bank">
+            </div>
+            <div class="field">
+              <label for="kyc-bank-name">Bank name</label>
+              <input type="text" id="kyc-bank-name" name="bankName" maxlength="120" required placeholder="Guaranty Trust Bank">
+            </div>
+            <div class="field">
+              <label for="kyc-bank-code">Bank code</label>
+              <input type="text" id="kyc-bank-code" name="bankCode" maxlength="6" required inputmode="numeric" autocomplete="off" placeholder="058">
+            </div>
+            <div class="field">
+              <label for="kyc-account-number">Account number</label>
+              <input type="text" id="kyc-account-number" name="accountNumber" maxlength="20" required inputmode="numeric" autocomplete="off" placeholder="0123456789">
+            </div>
+            <div class="field">
+              <label for="kyc-account-name">Account name</label>
+              <input type="text" id="kyc-account-name" name="accountName" maxlength="120" required autocomplete="name" placeholder="ADA OKORO">
+            </div>
+            <p class="form-status" id="kyc-status" role="status"></p>
+            <button type="submit" class="btn primary" id="kyc-submit">Save payout account</button>
+          </form>
+          <p class="fine">Your account number is encrypted (AES-256-GCM) before it is stored, and the API never sends it back — only the last four digits are ever shown on this page. If the server has no encryption key configured, the save is refused instead of storing the number in the clear.</p>
+        </div>
       </section>
 
       <!-- Referrals -->
@@ -128,6 +172,7 @@
 
   <script src="/feedback.js"></script>
   <script src="/auth.js"></script>
+  <script src="/kyc.js"></script>
   <script src="/dashboard.js"></script>
 </body>
 </html>

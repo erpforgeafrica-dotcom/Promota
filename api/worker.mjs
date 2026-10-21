@@ -21,6 +21,7 @@ import * as sb from '../api/supabase.mjs';
 import * as termii from '../providers/termii.mjs';
 import * as data from '../providers/data.mjs';
 import * as flw from '../providers/flutterwave.mjs';
+import * as payouts from '../api/payouts.mjs';
 
 const TICK_MS = Number(process.env.WORKER_TICK_MS || 15000);
 
@@ -45,6 +46,156 @@ async function finish(id, outcome, error = null) {
 }
 
 /* ------------------------------------------------------------- handlers */
+
+/**
+ * Deliver one data redemption and record the TRUE outcome.
+ *
+ * The rules, in order:
+ *   pending  -> the order is in flight at one provider. PARK it as
+ *               'processing'. Never fail over, never re-purchase.
+ *   unknown  -> the transport died mid-flight, so we do not know whether the
+ *               bundle landed. PARK it and let the recheck pass decide.
+ *               Re-sending here could buy a second bundle.
+ *   retryable-> the provider EXPLICITLY rejected the request (throttled, 5xx),
+ *               so nothing was bought and a retry of the same provider is
+ *               safe. THROW so the outbox re-queues the event.
+ *   refused  -> no provider could serve it. Mark it failed AND return the
+ *               points, because the promoter was charged for nothing.
+ *   delivered-> fulfilled, attributed to the provider that actually delivered.
+ */
+async function fulfilDataRedemption({ redemptionId, profileId, network, planCode, phone }) {
+  const r = await data.deliver({ network, phone, planCode, reference: redemptionId });
+
+  if (r.pending && !r.ok) {
+    await sb.update('redemptions', `id=eq.${redemptionId}`, {
+      state: 'processing',
+      provider: r.provider,
+      provider_ref: r.providerRef ?? redemptionId,
+      failure_reason: null,
+      updated_at: new Date().toISOString(),
+    });
+    return { delivered: false, retryable: false, note: `delivery pending at ${r.provider}; parked as processing` };
+  }
+
+  if (!r.ok && r.unknown) {
+    await sb.update('redemptions', `id=eq.${redemptionId}`, {
+      state: 'processing',
+      provider: r.provider || null,
+      provider_ref: r.providerRef ?? redemptionId,
+      failure_reason: `the provider outcome is UNKNOWN (${String(r.error || '').slice(0, 200)}); not re-purchasing`,
+      updated_at: new Date().toISOString(),
+    });
+    return { delivered: false, retryable: false, note: `delivery outcome unknown at ${r.provider}; parked as processing` };
+  }
+
+  if (!r.ok && r.retryable) {
+    // The provider refused outright, so nothing was bought. Re-queue.
+    throw new Error(`data delivery for ${redemptionId} was refused and is retryable: ${String(r.error || '').slice(0, 160)}`);
+  }
+
+  if (!r.ok) {
+    await sb.update('redemptions', `id=eq.${redemptionId}`, {
+      state: 'failed',
+      failure_reason: String(r.error || 'no provider could serve this redemption').slice(0, 300),
+      updated_at: new Date().toISOString(),
+    });
+    await payouts.reverseRedemptionPoints(redemptionId, 'no data provider could deliver the bundle');
+    return { delivered: false, retryable: false, note: 'delivery refused by every provider; the points were returned' };
+  }
+
+  await sb.update('redemptions', `id=eq.${redemptionId}`, {
+    state: 'fulfilled',
+    // The provider that ACTUALLY delivered, not a generic label: the audit
+    // trail has to name the counterparty.
+    provider: r.provider,
+    provider_ref: r.providerRef,
+    updated_at: new Date().toISOString(),
+  });
+  return { delivered: true, note: `delivered by ${r.provider}` };
+}
+
+/** The owner-set naira value of one point, in basis points of a naira. */
+async function cashRateBp() {
+  const rows = await sb.select('settings', 'key=eq.redemption.cash_rate_bp&select=value');
+  const bp = Number(rows?.[0]?.value?.v);
+  return Number.isFinite(bp) && bp > 0 ? bp : 0;
+}
+
+/**
+ * Pay a cash redemption, or park it honestly.
+ *
+ * The transfer is REQUESTED here and CONFIRMED by the provider's webhook.
+ * Until then the redemption stays 'processing' and nothing claims the money
+ * moved. The reference is derived from the redemption id, so a retry cannot
+ * move money twice.
+ *
+ * A redemption with no VERIFIED payout account is parked with the reason
+ * visible to the promoter. The reconcile pass retries it once an account
+ * exists — that is why this is a helper and not inline code.
+ */
+async function payCashRedemption({ redemptionId, profileId }) {
+  const row = (await sb.select('redemptions', `id=eq.${redemptionId}&select=id,points_spent,state`))?.[0];
+  if (!row) return { delivered: false, retryable: false, note: 'the redemption row no longer exists' };
+
+  const park = async (reason) => {
+    await sb.update('redemptions', `id=eq.${redemptionId}`, {
+      state: 'processing',
+      provider: 'flutterwave',
+      failure_reason: reason,
+      updated_at: new Date().toISOString(),
+    });
+    return { delivered: false, retryable: false, note: `cash payout parked: ${reason}` };
+  };
+
+  const account = await payouts.loadVerifiedPayoutAccount(profileId);
+  if (!account) {
+    return park('no verified payout account is on file yet — add a bank account on the payout-account tab');
+  }
+  if (account.ok === false) {
+    return park(account.reason || 'the saved payout account could not be read');
+  }
+
+  const rateBp = await cashRateBp();
+  if (!rateBp) {
+    return park('the naira rate for points is not set (settings.redemption.cash_rate_bp)');
+  }
+
+  const amountNaira = Math.floor((Number(row.points_spent) || 0) * rateBp / 10000);
+  if (!(amountNaira > 0)) {
+    return park('the points do not convert to a payable naira amount');
+  }
+
+  let transfer;
+  try {
+    transfer = await flw.createTransfer({
+      reference: `red-${redemptionId}`,
+      amount: amountNaira,
+      accountNumber: account.accountNumber,
+      accountBank: account.bankCode,
+      beneficiaryName: account.accountName,
+      narration: 'Promota cash redemption',
+    });
+  } catch (e) {
+    // The transfer was not confirmed. Re-queue the event so it is tried
+    // again with the SAME reference (the provider dedupes on it).
+    throw new Error(`cash transfer for ${redemptionId} did not go through: ${String(e.message || e).slice(0, 160)}`);
+  }
+
+  // The transfer is REQUESTED, not confirmed. The redemption stays
+  // 'processing' until the provider confirms it and the webhook settles it.
+  await sb.update('redemptions', `id=eq.${redemptionId}`, {
+    state: 'processing',
+    provider: 'flutterwave',
+    provider_ref: String(transfer.transferId || `red-${redemptionId}`),
+    failure_reason: null,
+    updated_at: new Date().toISOString(),
+  });
+  return {
+    delivered: false,
+    retryable: false,
+    note: `cash transfer ${transfer.transferId || 'requested'} for ₦${amountNaira.toLocaleString('en-NG')} — awaiting provider confirmation`,
+  };
+}
 
 const handlers = {
   /** A lead signed up: nothing to send yet, but it proves the fan-out works. */
@@ -76,57 +227,38 @@ const handlers = {
 
   /**
    * A redemption was requested.
-   * data -> needs an aggregator that is not configured yet, so it FAILS LOUDLY
-   *        and leaves the redemption reversible. It is never marked fulfilled.
-   * cash -> hand to Flutterwave with a stable reference.
+   * data -> deliver through the failover matrix. The outcome decides the
+   *        state, and NOTHING is fulfilled without a provider confirmation.
+   * cash -> needs a VERIFIED payout account and an owner-set naira rate.
    */
   'redemption.requested': async (p) => {
     if (p.kind === 'data') {
       const st = data.status();
       if (!st.ready) {
-        // retryable:false semantics are handled by throwing a non-retryable
-        // marker, so this row parks as failed rather than hot-looping.
+        // The provider is not configured at all. The points stay debited and
+        // the redemption is parked as failed with the reason — the promoter
+        // can see what happened and an operator can retry.
         await sb.update('redemptions', `id=eq.${p.redemption_id}`, {
           state: 'failed',
           failure_reason: st.reason.slice(0, 300),
           updated_at: new Date().toISOString(),
         });
-        return { delivered: true, note: 'data provider not configured; redemption parked as failed' };
+        await payouts.reverseRedemptionPoints(p.redemption_id, 'no data provider was configured to deliver the bundle');
+        return { delivered: true, note: 'data provider not configured; the points were returned' };
       }
       const profile = await sb.select('profiles', `id=eq.${p.profile_id}&select=phone_e164`);
       const phone = profile?.[0]?.phone_e164;
-      const r = await data.deliver({
+      return fulfilDataRedemption({
+        redemptionId: p.redemption_id,
+        profileId: p.profile_id,
         network: p.network,
-        phone,
         planCode: p.plan_code ?? null,
-        reference: p.redemption_id,
+        phone,
       });
-      if (!r.ok) {
-        await sb.update('redemptions', `id=eq.${p.redemption_id}`, {
-          state: 'failed',
-          failure_reason: String(r.error).slice(0, 300),
-          updated_at: new Date().toISOString(),
-        });
-        return { delivered: true, note: 'delivery refused; redemption parked as failed' };
-      }
-      await sb.update('redemptions', `id=eq.${p.redemption_id}`, {
-        state: 'fulfilled',
-        provider: 'data-aggregator',
-        provider_ref: r.providerRef,
-        updated_at: new Date().toISOString(),
-      });
-      return { delivered: true };
     }
 
-    // cash: a real transfer needs the beneficiary, which is collected at
-    // payout time rather than at request time. Until that exists, park it.
-    await sb.update('redemptions', `id=eq.${p.redemption_id}`, {
-      state: 'processing',
-      provider: 'flutterwave',
-      failure_reason: null,
-      updated_at: new Date().toISOString(),
-    });
-    return { delivered: true, note: 'cash queued for payout with beneficiary details' };
+    // ---- cash: a real transfer, or an honest park -------------------------
+    return payCashRedemption({ redemptionId: p.redemption_id, profileId: p.profile_id });
   },
 
   /** Task auto-approved by the DB sweeper; the points move with it. */
@@ -138,6 +270,12 @@ const handlers = {
    * aggregator is not configured the reward is logged as skipped rather
    * than retried forever — the month's points stay paid, and the note is
    * the audit trail.
+   *
+   * The bundle has no redemption row of its own, so the outcome has to be
+   * carried by the event itself: delivered, not-delivered-and-retryable, or
+   * not-delivered-and-not-retryable. An UNKNOWN outcome is NEVER retried:
+   * the provider may already have sent the bundle, and a second send would
+   * hand the promoter two.
    */
   'login.perfect_month': async (p) => {
     const mb = Number(p.mb) || 0;
@@ -159,8 +297,16 @@ const handlers = {
       planCode: plan.code,
       reference: `login:${p.month}:${p.profile_id}`,
     });
+    if (r.pending && !r.ok) {
+      return { delivered: false, retryable: false, note: `the ${p.month} data reward is in flight at ${r.provider}; it was not confirmed` };
+    }
     if (!r.ok) {
-      return { delivered: r.retryable !== false, note: `delivery refused: ${String(r.error).slice(0, 200)}` };
+      // A provider that rejected the request outright bought nothing, so a
+      // retry is safe. An UNKNOWN outcome is not: the bundle may have gone
+      // out already.
+      const retryable = Boolean(r.retryable) && !r.unknown;
+      return { delivered: false, retryable,
+        note: `the ${p.month} data reward was not delivered: ${String(r.error || '').slice(0, 200)}` };
     }
     return { delivered: true, note: `${p.month} data reward (${mb}MB) delivered as ${plan.name || plan.code}` };
   },
@@ -210,12 +356,28 @@ export async function tick() {
         unknownTopics.add(row.topic);
         log(`no handler for topic "${row.topic}" — leaving it queued`);
       }
-      await finish(row.id, 'dead', 'no handler registered for this topic');
+      // Match the log: a topic with no handler is a deploy/config gap, not a
+      // poison message. Marking it 'dead' silently dropped the event; leaving
+      // it queued (with the attempts ceiling as the eventual backstop) means a
+      // redeploy that adds the handler still drains it.
+      await finish(row.id, row.attempts >= 5 ? 'dead' : 'queued', 'no handler registered for this topic');
       failCount++;
       continue;
     }
     try {
-      await handler(row.payload || {});
+      const outcome = (await handler(row.payload || {})) || {};
+      if (outcome.delivered === false) {
+        // The handler reported that it did NOT deliver. Marking this outbox
+        // row 'delivered' would claim work that did not happen, so it either
+        // goes back on the queue (retryable) or is recorded as dead with the
+        // reason — never as a success.
+        const retryable = outcome.retryable !== false && row.attempts < 5;
+        await finish(row.id, retryable ? 'queued' : 'dead',
+          outcome.note || 'the handler reported that it did not deliver');
+        failCount++;
+        log(`topic ${row.topic} did not deliver:`, String(outcome.note || '').slice(0, 160));
+        continue;
+      }
       await finish(row.id, 'delivered');
       okCount++;
     } catch (e) {
@@ -245,6 +407,112 @@ export async function sweep() {
     }
   }
   return { autoApproved: approved.length };
+}
+
+/**
+ * Resolve redemptions that are parked as 'processing'.
+ *
+ * A bundle that was in flight when the worker parked it is still in flight,
+ * and nothing else would ever look at it again: the points would stay
+ * debited and the redemption would sit in 'processing' forever. This pass
+ * asks the provider where the order ended:
+ *
+ *   delivered -> the redemption is fulfilled, attributed to that provider
+ *   pending   -> still in flight; it stays parked
+ *   failed    -> the provider says the order failed, so the next provider is
+ *                tried with the SAME reference. If none can serve it, the
+ *                redemption fails and the points come back.
+ *
+ * The recheck interval is enforced with the row's own updated_at, so the
+ * backoff survives a restart instead of living only in memory.
+ */
+const RECHECK_MINUTES = Number(process.env.PENDING_RECHECK_MINUTES || 3);
+
+export async function reconcilePending() {
+  const st = data.status();
+  if (!st.ready) return { checked: 0, settled: 0, failed: 0, skipped: 'no data provider is configured' };
+
+  const cutoff = new Date(Date.now() - RECHECK_MINUTES * 60000).toISOString();
+  const rows = await sb.select(
+    'redemptions',
+    `state=eq.processing&provider=not.is.null&updated_at=lt.${encodeURIComponent(cutoff)}`
+    + `&select=id,profile_id,network,plan_code,provider,provider_ref,points_spent&limit=25`
+  );
+
+  let settled = 0;
+  let failed = 0;
+  let checked = 0;
+  for (const row of rows || []) {
+    checked++;
+
+    // A cash redemption parked for want of a payout account is resolved here,
+    // not by the data path: the promoter may have added one since.
+    if (row.provider === 'flutterwave') {
+      try {
+        await payCashRedemption({ redemptionId: row.id, profileId: row.profile_id });
+      } catch (e) {
+        failed++;
+        log(`cash payout retry for ${row.id} failed:`, String(e.message).slice(0, 160));
+      }
+      continue;
+    }
+
+    const res = await data.recheck({
+      provider: row.provider,
+      providerRef: row.provider_ref,
+      reference: row.id,
+    });
+
+    if (res.ok) {
+      await sb.update('redemptions', `id=eq.${row.id}`, {
+        state: 'fulfilled',
+        provider: res.provider || row.provider,
+        provider_ref: res.providerRef || row.provider_ref,
+        updated_at: new Date().toISOString(),
+      });
+      settled++;
+      continue;
+    }
+
+    if (res.pending) {
+      // Still in flight. Touch updated_at so the next look is one interval
+      // away, and record what the provider said.
+      await sb.update('redemptions', `id=eq.${row.id}`, {
+        failure_reason: `still in flight at ${row.provider} (${res.status || 'pending'})`,
+        updated_at: new Date().toISOString(),
+      });
+      continue;
+    }
+
+    if (!res.failover) {
+      // The provider cannot say anything conclusive. Leave it parked and
+      // visible rather than guessing.
+      await sb.update('redemptions', `id=eq.${row.id}`, {
+        failure_reason: `the provider could not confirm the order: ${String(res.error || '').slice(0, 200)}`,
+        updated_at: new Date().toISOString(),
+      });
+      continue;
+    }
+
+    // The provider says the order failed. Try the next provider with the
+    // SAME reference; if none can serve it, the redemption fails and the
+    // points are returned.
+    const profile = await sb.select('profiles', `id=eq.${row.profile_id}&select=phone_e164`);
+    try {
+      const outcome = await fulfilDataRedemption({
+        redemptionId: row.id,
+        profileId: row.profile_id,
+        network: row.network,
+        planCode: row.plan_code ?? null,
+        phone: profile?.[0]?.phone_e164,
+      });
+      if (outcome.delivered === false) failed++;
+    } catch (e) {
+      failed++;
+      log(`re-delivery for ${row.id} failed:`, String(e.message).slice(0, 160));
+    }
+  }
+  return { checked, settled, failed };
 }
 
 let timer = null;
@@ -329,6 +597,7 @@ export function start() {
   initKati().catch(() => {});
   const run = async () => {
     try { await sweep(); } catch (e) { log('sweep error:', String(e.message).slice(0, 160)); }
+    try { await reconcilePending(); } catch (e) { log('reconcile error:', String(e.message).slice(0, 160)); }
     try { await tick(); } catch (e) { log('tick error:', String(e.message).slice(0, 160)); }
   };
   run();

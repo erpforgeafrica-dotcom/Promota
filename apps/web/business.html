@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en-NG">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#04120b" id="themeColor">
+  <title>Business console — Promota campaigns</title>
+  <meta name="description" content="Promota business console: create campaigns, fund escrow with a payment link, and track every payment in one place.">
+  <script src="/theme-boot.js"></script>
+  <link rel="icon" type="image/svg+xml" href="/assets/identity/favicon.svg">
+  <link rel="icon" type="image/png" sizes="180x180" href="/assets/identity/favicon-180.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/identity/favicon-180.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <a href="/" class="brand" aria-label="Promota home">
+        <img class="brand-logo" src="/assets/identity/mark.svg" alt="" aria-hidden="true" width="30" height="30">
+        <span class="brand-name"><span class="ow">Pro</span><span class="works">mota</span> business</span>
+      </a>
+      <div class="nav-cta">
+        <span class="fine" id="whoami" hidden></span>
+        <button id="dash-link" class="theme-btn" type="button" hidden>My dashboard</button>
+        <button id="signout" class="theme-btn" type="button">Sign out</button>
+        <button id="themeBtnBiz" class="theme-btn" type="button" aria-pressed="false" aria-label="Toggle light and dark theme">Theme</button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <section class="section">
+
+      <!-- Signed out / not a business -->
+      <section id="gate" class="panel" hidden>
+        <h2 id="gate-title">Sign in required</h2>
+        <p id="gate-copy">Your session is missing or expired. Sign in with your business account to run campaigns.</p>
+        <p><a class="btn gold" href="/">Sign in</a> <a class="theme-btn" href="/dashboard.html">My dashboard</a></p>
+      </section>
+
+      <!-- Live data -->
+      <section id="app" hidden>
+        <p class="eyebrow">Business workspace</p>
+        <h1>Campaign manager</h1>
+        <div id="load-status" class="form-status" role="status"></div>
+
+        <div class="tabs" role="tablist" aria-label="Business sections">
+          <button class="tab active" role="tab" aria-checked="true" data-pane="campaigns" type="button">Campaigns</button>
+          <button class="tab" role="tab" aria-checked="false" data-pane="new" type="button">New campaign</button>
+          <button class="tab" role="tab" aria-checked="false" data-pane="payments" type="button">Payments</button>
+          <button class="tab" role="tab" aria-checked="false" data-pane="owner" type="button">Business verification</button>
+        </div>
+
+        <!-- Campaigns -->
+        <section id="pane-campaigns" class="pane" role="tabpanel">
+          <div id="campaigns-status" class="form-status" role="status"></div>
+          <div class="table-wrap"><table id="campaigns-table"><thead><tr><th>Title</th><th>Platform</th><th>Objective</th><th>State</th><th>Budget</th><th>Escrow funded</th><th>Actions</th></tr></thead><tbody id="campaigns-body"></tbody></table></div>
+          <div id="paylink-out" class="panel paylink-box" hidden></div>
+        </section>
+
+        <!-- New campaign -->
+        <section id="pane-new" class="pane" role="tabpanel" hidden>
+          <div class="panel">
+            <h2>Create a campaign</h2>
+            <form id="business-form">
+              <div class="field">
+                <label for="business-title">Title</label>
+                <input type="text" id="business-title" name="title" maxlength="200" required placeholder="What the campaign is called">
+              </div>
+              <div class="field">
+                <label for="business-platform">Platform</label>
+                <input type="text" id="business-platform" name="platform" maxlength="60" required placeholder="Instagram, Telegram, TikTok…">
+              </div>
+              <div class="field">
+                <label for="business-objective">Objective</label>
+                <select id="business-objective" name="objective">
+                  <option value="click">click</option>
+                  <option value="signup">signup</option>
+                  <option value="code">code</option>
+                  <option value="api_post">api_post</option>
+                  <option value="repost">repost</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="business-brief">Brief</label>
+                <textarea id="business-brief" name="brief" rows="4" maxlength="2000" placeholder="What promoters should post, and any rules they must follow"></textarea>
+              </div>
+              <div class="field">
+                <label for="business-budget">Budget (naira)</label>
+                <input type="number" id="business-budget" name="budget" min="1" step="1" required inputmode="numeric" placeholder="50000">
+              </div>
+              <div class="field">
+                <label for="business-price">Price per outcome (naira)</label>
+                <input type="number" id="business-price" name="price" min="1" step="1" required inputmode="numeric" placeholder="500">
+              </div>
+              <div class="field">
+                <label for="business-promoter-share">Promoter share (basis points)</label>
+                <input type="number" id="business-promoter-share" name="promoterShareBp" min="0" max="10000" step="1" inputmode="numeric" placeholder="7000 = 70%">
+              </div>
+              <div class="field">
+                <label for="business-fraud-reserve">Fraud reserve (basis points)</label>
+                <input type="number" id="business-fraud-reserve" name="fraudReserveBp" min="0" max="10000" step="1" inputmode="numeric" placeholder="500">
+              </div>
+              <div class="field">
+                <label for="business-margin-floor">Margin floor (basis points)</label>
+                <input type="number" id="business-margin-floor" name="marginFloorBp" min="0" max="10000" step="1" inputmode="numeric" placeholder="0">
+              </div>
+
+              <h3>Tasks</h3>
+              <p class="fine">Every task needs a caption and a tracked https link. Between 1 and 10 tasks per campaign.</p>
+              <div id="task-rows"></div>
+              <p><button id="add-task" class="btn ghost" type="button">Add another task</button></p>
+
+              <p class="form-status" id="campaign-form-status" role="status"></p>
+              <button type="submit" class="btn primary" id="campaign-submit">Create campaign</button>
+            </form>
+            <p class="fine">A campaign starts in review. It goes live once an admin confirms it and escrow is funded through a payment link.</p>
+            <p class="fine">Creating a campaign needs a verified campaign owner. If your record is not verified yet, the <em>Business verification</em> tab shows what state it is in.</p>
+          </div>
+        </section>
+
+        <!-- Payments -->
+        <section id="pane-payments" class="pane" role="tabpanel" hidden>
+          <form id="payments-filter" class="filter-bar">
+            <div class="field">
+              <label for="payments-campaign">Campaign</label>
+              <select id="payments-campaign"></select>
+            </div>
+            <button type="submit" class="btn primary">Load payments</button>
+          </form>
+          <div id="payments-status" class="form-status" role="status"></div>
+          <div class="table-wrap"><table id="payments-table"><thead><tr><th>Reference</th><th>Amount</th><th>Status</th><th>Paid at</th></tr></thead><tbody id="payments-body"></tbody></table></div>
+        </section>
+
+        <!-- Business verification (campaign owner) -->
+        <section id="pane-owner" class="pane" role="tabpanel" hidden>
+          <div class="panel">
+            <h2>Business verification</h2>
+            <p class="fine" id="owner-state">Checking your verification status…</p>
+            <p class="fine">An admin reads these details and decides whether you may run campaigns. Until the record is verified, campaign creation stays closed — the server refuses it, and this page reports it.</p>
+            <form id="owner-form">
+              <div class="field">
+                <label for="owner-kind">I am applying as</label>
+                <select id="owner-kind" name="kind">
+                  <option value="business">a business</option>
+                  <option value="individual">an individual</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="owner-display-name">Display name</label>
+                <input type="text" id="owner-display-name" name="displayName" maxlength="120" required placeholder="How a reviewer should address you">
+              </div>
+              <div class="field" id="owner-business-name-field">
+                <label for="owner-business-name">Business name</label>
+                <input type="text" id="owner-business-name" name="businessName" maxlength="200" placeholder="Registered business name">
+              </div>
+              <div class="field" id="owner-business-reg-field">
+                <label for="owner-business-reg">Business registration number</label>
+                <input type="text" id="owner-business-reg" name="businessReg" maxlength="60" placeholder="RC number, if you have one">
+              </div>
+              <div class="field">
+                <label for="owner-website">Website</label>
+                <input type="url" id="owner-website" name="website" maxlength="500" placeholder="https://example.com">
+              </div>
+              <div class="field">
+                <label for="owner-contact">Contact</label>
+                <input type="text" id="owner-contact" name="contact" maxlength="160" required placeholder="Phone, email or social handle a reviewer can reach">
+              </div>
+              <p class="form-status" id="owner-form-status" role="status"></p>
+              <button type="submit" class="btn primary" id="owner-submit">Submit for verification</button>
+            </form>
+            <p class="fine">You can send this again while the review is pending. Once an admin verifies the record, the form stops being needed and campaigns open up.</p>
+          </div>
+        </section>
+
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <section class="section">
+      <p class="copy">© 2026 Promota. All rights reserved. Campaign spend is only released against verified outcomes.</p>
+    </section>
+  </footer>
+
+  <script src="/feedback.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/business.js"></script>
+</body>
+</html>

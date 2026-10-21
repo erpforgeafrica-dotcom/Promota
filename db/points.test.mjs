@@ -282,18 +282,18 @@ await withDb(async db => {
       'minimum');
 
     await rejects(db, 'a redemption above the balance is refused', `
-      select redeem_points('11130000-0000-0000-0000-000000000000','data',500,'redeem-d-2','MTN')`,
+      select redeem_points('11130000-0000-0000-0000-000000000000','data',500,'redeem-d-2','MTN','MTN DATA - 1GB - MONTHLY')`,
       'insufficient points');
 
     await rejects(db, 'a zero-point redemption is refused', `
-      select redeem_points('11111111-1111-1111-1111-111111111111','data',0,'redeem-d-3','MTN')`,
+      select redeem_points('11111111-1111-1111-1111-111111111111','data',0,'redeem-d-3','MTN','MTN DATA - 1GB - MONTHLY')`,
       'positive');
   }
 
   /* ---------------------- 14. the balance actually falls on redemption */
   {
     await accepts(db, 'a valid data redemption is created', `
-      select redeem_points('11111111-1111-1111-1111-111111111111','data',500,'redeem-d-ok','MTN')`);
+      select redeem_points('11111111-1111-1111-1111-111111111111','data',500,'redeem-d-ok','MTN','MTN DATA - 1GB - MONTHLY')`);
 
     const bal = await scalar(db,
       `select points_balance('11111111-1111-1111-1111-111111111111') as v`);
@@ -383,6 +383,43 @@ await withDb(async db => {
       select count(*)::int as v from pg_tables
        where schemaname='public' and tablename='${t}' and rowsecurity`);
     check(`row level security is enabled on ${t}`, on === 1, `rowsecurity=${on}`);
+  }
+
+  /* ------------------ 22. a promoter cannot price their own task (0017) ---
+   * `grant update on public.tasks to authenticated` plus the tasks_submit
+   * policy let the ASSIGNED promoter update their own task row, including
+   * points_awarded. Measured before the fix: as `authenticated`, an UPDATE
+   * that set points_awarded = 999999 was ACCEPTED and the worker then paid
+   * 999,999 points. The trigger is the only thing that can refuse it here,
+   * so the case runs as the promoter with auth.uid() returning them. */
+  {
+    const TASK = '55555555-5555-5555-5555-555555555555';
+    const before = await scalar(db, `select points_awarded as v from tasks where id = '${TASK}'`);
+
+    await db.exec('begin');
+    let refused = false;
+    let detail = '';
+    try {
+      await db.exec(`
+        create or replace function auth.uid() returns uuid language sql stable
+          as $$ select '11111111-1111-1111-1111-111111111111'::uuid $$;
+        set local role authenticated;
+        update tasks set points_awarded = 999999 where id = '${TASK}';`);
+    } catch (e) {
+      refused = true;
+      detail = String(e.message || e).split('\n')[0];
+    }
+    try { await db.exec('rollback'); } catch { /* already unwound */ }
+    await db.exec(`create or replace function auth.uid() returns uuid
+      language sql stable as $$ select null::uuid $$;`);
+
+    check('a promoter cannot set their own task points', refused === true,
+      refused ? '' : 'the UPDATE was ACCEPTED');
+    check('the refusal names the platform-owned reason', /platform/i.test(detail), detail);
+
+    const after = await scalar(db, `select points_awarded as v from tasks where id = '${TASK}'`);
+    check('the task points are unchanged after the attempt', Number(after) === Number(before),
+      `${before} -> ${after}`);
   }
 
   unverified('anon cannot read another promoter\'s points over HTTP',

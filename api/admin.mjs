@@ -532,7 +532,12 @@ export async function approveTask(req, params) {
   if (!updated?.length) return fail('the task changed state before we could save', 409);
 
   if (views != null) {
-    await sb.update('task_proofs', `task_id=eq.${id}`, { views })
+    // A count a REVIEWER read from the submitted proof is real evidence, and
+    // the provenance has to say so: migration 0015 pays the views bonus only
+    // on 'scraped' or 'reviewer' rows. Without this stamp the bonus would
+    // never pay, because the submit path can only mark 'scraped' or
+    // 'client_claimed'.
+    await sb.update('task_proofs', `task_id=eq.${id}`, { views, views_source: 'reviewer' })
       .catch(() => { /* no proof row (legacy task) — nothing to correct */ });
   }
 
@@ -954,7 +959,10 @@ export async function confirmCampaign(req, params) {
       'campaign_owners',
       `profile_id=eq.${campaign.owner_id}&select=verification_state`
     );
-    if (ownerRow?.verification_state === 'rejected') {
+    // Only a VERIFIED owner may have a campaign go live. The old check blocked
+    // only 'rejected', so a 'pending' owner slipped through and a campaign
+    // could launch before the owner's KYC had been approved.
+    if (ownerRow?.verification_state !== 'verified') {
       return fail('the campaign owner is not approved', 409);
     }
   }

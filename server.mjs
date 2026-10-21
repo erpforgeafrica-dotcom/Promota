@@ -55,10 +55,19 @@ const RATE_MAX = Number(process.env.RATE_LIMIT_PER_MIN || 60);
 const rateBuckets = new Map();
 
 function clientIp(req) {
-  return req.headers['x-real-ip']
-    || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-    || req.socket?.remoteAddress
-    || 'unknown';
+  // Behind Railway (and any reverse proxy) the client-supplied headers are
+  // untrusted: x-real-ip and the FIRST x-forwarded-for entry are both
+  // attacker-controlled, so switching them rotated the rate-limit bucket and
+  // defeated the only global limiter. TRUST_PROXY_HOPS (default 1) says how
+  // many proxies sit in front of us; we take the entry that many places from
+  // the right, which is the one our own edge appended.
+  const hops = Number(process.env.TRUST_PROXY_HOPS || 1);
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) {
+    const chain = String(xff).split(',').map(s => s.trim()).filter(Boolean);
+    if (chain.length) return chain[Math.max(0, chain.length - hops)] || chain[chain.length - 1];
+  }
+  return req.socket?.remoteAddress || 'unknown';
 }
 
 /** Sliding window per IP. Returns retry-after seconds when throttled. */

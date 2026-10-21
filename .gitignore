@@ -27,3 +27,7 @@ apps/web/config.js
 /tmp-*/
 .DS_Store
 Thumbs.db
+
+# scratch output from local runs — captured at the repo root by accident
+/tmp_*.txt
+/completion-proof.txt

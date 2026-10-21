@@ -57,6 +57,7 @@
     document.querySelectorAll('.pane').forEach(function (p) {
       p.hidden = p.id !== 'pane-' + id;
     });
+    if (id === 'kyc' && window.PromotaKyc && window.PromotaKyc.load) window.PromotaKyc.load();
   }
   document.querySelectorAll('.tab').forEach(function (t) {
     t.addEventListener('click', function () { setPane(t.getAttribute('data-pane')); });
@@ -287,16 +288,116 @@
     });
   }
 
+  /* ---------- data plan catalogue ----------
+     A data redemption is refused by the server without a planCode, so the
+     client must pick a real plan from the live catalogue first. The
+     catalogue warms asynchronously: an empty list is a normal answer, not
+     an error, and it must not allow a submit. */
+  var plansByNetwork = {};
+
+  function planPrice(p) {
+    if (p.priceNaira == null) return null;
+    var n = Number(p.priceNaira);
+    if (!isFinite(n)) return null;
+    return '₦' + n.toLocaleString('en-NG', { maximumFractionDigits: 2 });
+  }
+  function planSize(p) {
+    var mb = Number(p.mb);
+    if (isFinite(mb) && mb > 0) return mb + 'MB';
+    return 'Data';
+  }
+  function planCadence(p) {
+    var d = String(p.duration || '').trim().toUpperCase();
+    if (!d) return '';
+    if (/^\s*1\s*DAY/.test(d)) return 'Daily';
+    if (/WEEK/.test(d)) return 'Weekly';
+    if (/MONTH/.test(d)) return 'Monthly';
+    return d.charAt(0) + d.slice(1).toLowerCase();
+  }
+  function planLabel(p) {
+    var size = planSize(p);
+    var cad = planCadence(p);
+    var price = planPrice(p);
+    var head = cad ? size + ' ' + cad : size;
+    if (price) head += ' — ' + price;
+    var code = String(p.code || '');
+    return code ? head + ' (' + code + ')' : head;
+  }
+
   function redeemPaneBind() {
     var form = document.getElementById('redeem-form');
     if (!form) return;
     var kindSel = document.getElementById('redeem-kind');
     var netSel = document.getElementById('redeem-network');
+    var planSel = document.getElementById('redeem-plan');
+    var planHint = document.getElementById('redeem-plan-hint');
+    var netField = document.getElementById('redeem-network-field');
+    var planField = document.getElementById('redeem-plan-field');
+    var submitBtn = document.getElementById('redeem-submit') || form.querySelector('button[type="submit"]');
+    if (!kindSel || !netSel || !planSel) return;
+
+    function showField(field, on) {
+      if (field) field.style.display = on ? '' : 'none';
+    }
+    function updateSubmitState() {
+      if (!submitBtn) return;
+      if (kindSel.value !== 'data') { submitBtn.disabled = false; return; }
+      submitBtn.disabled = !planSel.value;
+    }
+    function renderPlans(net, plans, errMsg) {
+      planSel.innerHTML = '';
+      if (errMsg) {
+        if (planHint) planHint.textContent = errMsg;
+        updateSubmitState();
+        return;
+      }
+      if (!plans || !plans.length) {
+        if (planHint) planHint.textContent = 'No data plans are available for this network yet.';
+        updateSubmitState();
+        return;
+      }
+      for (var i = 0; i < plans.length; i++) {
+        var p = plans[i] || {};
+        var opt = document.createElement('option');
+        opt.value = String(p.code || '');
+        opt.textContent = planLabel(p);
+        planSel.appendChild(opt);
+      }
+      if (planHint) {
+        planHint.textContent = plans.length + (plans.length === 1 ? ' plan' : ' plans') +
+          ' available for ' + net + '. Pick the bundle you want.';
+      }
+      updateSubmitState();
+    }
+    function loadPlans(net) {
+      var network = String(net || '').toUpperCase();
+      if (!network) return;
+      if (plansByNetwork[network]) { renderPlans(network, plansByNetwork[network]); return; }
+      if (planHint) planHint.textContent = 'Loading ' + network + ' data plans…';
+      updateSubmitState();
+      Auth.api('/api/plans?network=' + encodeURIComponent(network)).then(function (r) {
+        if (String(netSel.value || '').toUpperCase() !== network) return; /* the user moved on */
+        if (r.status !== 200 || !r.body || !Array.isArray(r.body.plans)) {
+          renderPlans(network, [], (r.body && r.body.error) || 'Could not load data plans. Try again.');
+          return;
+        }
+        plansByNetwork[network] = r.body.plans;
+        renderPlans(network, r.body.plans);
+      });
+    }
     var sync = function () {
-      netSel.parentElement && (netSel.style.display = kindSel.value === 'data' ? '' : 'none');
+      var isData = kindSel.value === 'data';
+      showField(netField, isData);
+      showField(planField, isData);
+      if (isData) loadPlans(netSel.value);
+      else updateSubmitState();
     };
+
     kindSel.addEventListener('change', sync);
+    netSel.addEventListener('change', function () { loadPlans(netSel.value); });
+    planSel.addEventListener('change', updateSubmitState);
     sync();
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var stat = document.getElementById('redeem-status');
@@ -306,12 +407,21 @@
         if (stat) { stat.textContent = 'Points must be a positive whole number.'; stat.className = 'form-status error'; }
         return;
       }
+      var planCode = planSel.value;
+      if (kindSel.value === 'data' && !planCode) {
+        if (stat) { stat.textContent = 'Choose a data plan before redeeming.'; stat.className = 'form-status error'; }
+        FB && FB.err('Choose a data plan before redeeming.');
+        return;
+      }
       if (btn) btn.disabled = true;
       if (stat) { stat.textContent = 'Sending…'; stat.className = 'form-status'; }
-      var body = { kind: kindSel.value, points: points };
-      if (kindSel.value === 'data') body.network = netSel.value;
+      var body = { kind: kindSel.value, points: points, nonce: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)) };
+      if (kindSel.value === 'data') {
+        body.network = netSel.value;
+        body.planCode = planCode;
+      }
       Auth.api('/api/redeem', { method: 'POST', body: body }).then(function (r) {
-        if (btn) btn.disabled = false;
+        updateSubmitState();
         if (r.status === 202 && stat) {
           stat.textContent = 'Redemption queued — fulfilment happens in the background.';
           stat.className = 'form-status ok';
@@ -460,6 +570,7 @@
   loadMe().then(function (me) {
     if (!me) return;
     redeemPaneBind();
+    if (window.PromotaKyc && window.PromotaKyc.bind) window.PromotaKyc.bind();
     return Promise.all([
       loadTasks(),
       loadMine(),

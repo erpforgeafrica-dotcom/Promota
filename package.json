@@ -8,11 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node apps/web/phone.test.mjs && node apps/web/lead.test.mjs && node api/api.test.mjs && node scripts/checkImage.mjs && node db/ledger.test.mjs && node db/leads.test.mjs && node db/points.test.mjs",
+    "test": "node apps/web/phone.test.mjs && node apps/web/lead.test.mjs && node api/api.test.mjs && node scripts/checkImage.mjs && node db/ledger.test.mjs && node db/leads.test.mjs && node db/points.test.mjs && node db/redemption-integrity.test.mjs && node db/views-evidence.test.mjs && node providers/dataManager.test.mjs && node providers/payoutCrypto.test.mjs",
     "site": "node scripts/checkSite.mjs",
     "serve": "node scripts/serve.mjs",
     "db:up": "node scripts/migrateUp.mjs",
-    "db:test": "node db/ledger.test.mjs && node db/leads.test.mjs && node db/points.test.mjs",
+    "db:test": "node db/ledger.test.mjs && node db/leads.test.mjs && node db/points.test.mjs && node db/redemption-integrity.test.mjs && node db/views-evidence.test.mjs",
     "db:remote": "node scripts/migrateRemote.mjs",
     "db:probe": "node scripts/dbProbe.mjs",
     "db:link": "node scripts/linkSupabase.mjs",

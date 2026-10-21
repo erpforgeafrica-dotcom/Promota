@@ -20,6 +20,7 @@ import * as social from './social.mjs';
 import * as business from './business.mjs';
 import * as mining from './mining.mjs';
 import * as checkin from './checkin.mjs';
+import * as payouts from './payouts.mjs';
 
 const ok = (body, status = 200) => ({ status, body });
 const fail = (message, status = 400, extra = {}) => ({ status, body: { error: message, ...extra } });
@@ -276,6 +277,13 @@ export async function submitTask(req, params) {
     }
   }
 
+  // PROVENANCE (migration 0015). A scraped count is real evidence; a number
+  // the promoter typed is not. The SCRAPED value wins when both exist: the
+  // old code stored the typed number and set parsed=true, which paid the
+  // points-farming bracket for a typed number wearing a scraped label.
+  const evidenceViews = parsedViews != null ? parsedViews : views;
+  const viewsSource = parsedViews != null ? 'scraped' : (views != null ? 'client_claimed' : null);
+
   try {
     await sb.insert('task_proofs', {
       task_id: id,
@@ -283,8 +291,9 @@ export async function submitTask(req, params) {
       platform,
       post_url: proofUrl,
       screenshot_url: screenshotUrl,
-      views: views ?? parsedViews,
+      views: evidenceViews,
       parsed: parsedViews != null,
+      views_source: viewsSource,
       verdict,
       verdict_source: verdictSource,
     });
@@ -296,8 +305,9 @@ export async function submitTask(req, params) {
       platform,
       post_url: proofUrl,
       screenshot_url: screenshotUrl,
-      views: views ?? parsedViews,
+      views: evidenceViews,
       parsed: parsedViews != null,
+      views_source: viewsSource,
       verdict,
       verdict_source: verdictSource,
     });
@@ -372,9 +382,23 @@ export async function redeem(req) {
     return fail('a data redemption needs network MTN, GLO, AIRTEL or 9MOBILE');
   }
 
-  // Stable reference: a replayed request returns the same redemption instead
-  // of charging the promoter twice.
-  const idem = `redeem:${auth.sub}:${kind}:${points}:${network || 'cash'}`;
+  // The plan code is forwarded to the provider by the worker; a data
+  // redemption is refused in the DB if it is missing, so validate it here
+  // too for a clean 400 instead of a raw function error.
+  const planCode = kind === 'data' ? String(req.body?.planCode || '').trim() : null;
+  if (kind === 'data' && !planCode) {
+    return fail('a data redemption needs a planCode');
+  }
+
+  // Idempotency is scoped to a per-request nonce, NOT to the amount. The old
+  // key redeem:<profile>:<kind>:<points>:<network> made a legitimate SECOND
+  // redemption of the same value look like a replay: the caller got the old
+  // redemption id back with no debit and no fulfilment, i.e. silently unpaid.
+  // The client sends a fresh nonce per request; a retry of the SAME request
+  // reuses it and returns the original row. Fall back to randomUUID so an
+  // older client cannot collide.
+  const nonce = String(req.body?.nonce || '').trim() || crypto.randomUUID();
+  const idem = `redeem:${auth.sub}:${nonce}`;
 
   let redemptionId;
   try {
@@ -384,6 +408,7 @@ export async function redeem(req) {
       p_points: points,
       p_idem: idem,
       p_network: network,
+      p_plan_code: planCode,
     });
   } catch (e) {
     const m = String(e.message);
@@ -393,7 +418,7 @@ export async function redeem(req) {
     return fail(`redemption refused: ${m.slice(0, 140)}`, 400);
   }
 
-  return ok({ redemptionId, kind, points, network, state: 'requested' }, 202);
+  return ok({ redemptionId, kind, points, network, planCode, state: 'requested' }, 202);
 }
 
 /* -------------------------------------------------------------- webhooks */
@@ -418,16 +443,68 @@ export async function flutterwaveWebhook(req, rawBody) {
   const ref = String(evt?.data?.reference || '');
   if (!ref) return fail('webhook carries no reference', 400);
 
-  // reference is our redemption id, so the payout is matched without guessing
+  // TWO reference shapes exist and BOTH reach a PostgREST filter, so both are
+  // constrained to the exact shapes we issue:
+  //   red-<uuid> / <uuid> -> a cash redemption payout
+  //   cpay-<uuid>         -> a business funding a campaign
+  // An unconstrained value like "x&id=gt.0" would otherwise widen the filter.
+  const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+  const isRedemption = new RegExp(`^(red-)?${UUID}$`, 'i').test(ref);
+  const isCampaignPayment = new RegExp(`^cpay-${UUID}$`, 'i').test(ref);
+  if (!isRedemption && !isCampaignPayment) {
+    return fail('webhook reference is not a recognised reference', 400);
+  }
+
+  // ---- MONEY IN: a business paid for a campaign -------------------------
+  if (isCampaignPayment) {
+    if (event !== 'transfer.completed') {
+      await sb.update('campaign_payments', `provider_ref=eq.${ref}`, {
+        status: 'failed',
+        failure_reason: String(evt?.data?.complete_message || 'the transfer failed').slice(0, 300),
+        updated_at: new Date().toISOString(),
+      });
+      return ok({ received: true, event, campaignPayment: ref, settled: false });
+    }
+    // The verif-hash proves the caller knows the secret, but it is replayable:
+    // the authoritative amount and status are fetched by id, not read from the
+    // body.
+    const verify = await flw.verifyTransfer(String(evt?.data?.id ?? ''));
+    if (!verify.successful) {
+      return fail(`transfer ${String(evt?.data?.id)} is not confirmed successful (${verify.status})`, 409);
+    }
+    const settled = await payouts.settleCampaignPayment({
+      reference: ref,
+      providerTxId: evt?.data?.id,
+      amountNaira: verify.amount,
+    });
+    if (!settled.ok) return fail(settled.error || 'the payment could not be settled', 409);
+    return ok({ received: true, event, campaignPayment: ref, settled: Boolean(settled.settled) });
+  }
+
+  // ---- MONEY OUT: a promoter was paid for a cash redemption --------------
+  const redemptionId = ref.replace(/^red-/, '');
+
   const rows = await sb.select(
     'redemptions',
-    `idempotency_key=eq.${ref}&select=id,state,kind,points_spent,value_minor`
+    `id=eq.${redemptionId}&select=id,state,kind,points_spent,value_minor`
   );
   const redemption = rows?.[0];
   if (!redemption) return ok({ matched: false, reason: 'no redemption for that reference' });
   if (redemption.state === 'fulfilled') return ok({ alreadyFulfilled: true });
 
   if (event === 'transfer.completed') {
+    // A "completed" event is only trusted after the transfer is confirmed
+    // against Flutterwave directly. The verif-hash proves the caller knows the
+    // secret, but it is replayable, so the authoritative amount and status are
+    // fetched by id rather than read from the webhook body.
+    const verify = await flw.verifyTransfer(String(evt?.data?.id ?? ''));
+    if (!verify.successful) {
+      return fail(`transfer ${String(evt?.data?.id)} is not confirmed successful (${verify.status})`, 409);
+    }
+    const amountNaira = Number(verify.amount);
+    if (!Number.isFinite(amountNaira) || amountNaira < 0) {
+      return fail('verified transfer carried no valid amount', 409);
+    }
     await sb.update(
       'redemptions',
       `id=eq.${redemption.id}`,
@@ -435,14 +512,16 @@ export async function flutterwaveWebhook(req, rawBody) {
         state: 'fulfilled',
         provider: 'flutterwave',
         provider_ref: String(evt?.data?.id ?? ref),
-        value_minor: Number(evt?.data?.amount ?? 0) * 100,
+        // Integer naira -> kobo. The old *100 on a float body value both
+        // trusted the caller and risked a rounding error in an amount field.
+        value_minor: Math.round(amountNaira) * 100,
         updated_at: new Date().toISOString(),
       }
     );
   } else {
-    // A failed cash payout must not silently keep the points. Marking it failed
-    // leaves the refund path (reverse the redemption entry) to an operator,
-    // which is deliberately a human decision.
+    // A failed cash payout must not silently keep the points: the money did
+    // not arrive, so the debit is reversed. The reversal is idempotent, so a
+    // replayed webhook cannot credit twice.
     await sb.update(
       'redemptions',
       `id=eq.${redemption.id}`,
@@ -452,6 +531,7 @@ export async function flutterwaveWebhook(req, rawBody) {
         updated_at: new Date().toISOString(),
       }
     );
+    await payouts.reverseRedemptionPoints(redemption.id, 'the cash payout failed, so the points were returned');
   }
 
   return ok({ received: true, event, redemptionId: redemption.id });
@@ -653,8 +733,48 @@ export async function blogPost(_req, params) {
   return ok({ post: { ...blogSummary(post), body: post.body } });
 }
 
-/* ----------------------------------------------------------------- router */
+/* --------------------------------------------------------- data plan catalogue */
 
+/**
+ * GET /api/plans?network=MTN — the live bundle catalogue.
+ *
+ * The catalogue is what the provider actually offers right now; it is never
+ * invented here. An empty list is a real answer (the catalogue warms in the
+ * background and a cold container has none yet), so the response says so
+ * rather than pretending there are no bundles forever.
+ */
+export async function plans(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+
+  // server.mjs hands the handler the raw IncomingMessage; the query string
+  // lives on req.url.
+  let requested = '';
+  try {
+    requested = String(new URL(req.url || '/', 'http://localhost').searchParams.get('network') || '').trim().toUpperCase();
+  } catch { requested = ''; }
+  const all = data.plans() || [];
+  const filtered = requested
+    ? all.filter((p) => String(p.network || '').toUpperCase() === requested)
+    : all;
+
+  const st = data.status();
+  return ok({
+    plans: filtered.map((p) => ({
+      code: p.code,
+      name: p.name || p.code,
+      mb: p.mb ?? null,
+      network: p.network || null,
+      priceNaira: p.priceNaira ?? null,
+      duration: p.duration || null,
+    })),
+    catalogueReady: all.length > 0,
+    provider: st.provider || null,
+    reason: all.length ? null : (st.reason || 'the bundle catalogue has not warmed up yet'),
+  });
+}
+
+/* ----------------------------------------------------------------- router */
 /**
  * Exact routes first — the shape server.mjs looks up by "METHOD /path".
  * Rate limiting, the 404 for unknown /api paths, the 405 on POSTs to static
@@ -683,8 +803,12 @@ const exactRoutes = {
   'POST /api/v1/campaigns': business.createCampaignSelfServe,
   'POST /api/v1/campaign-owners': business.submitCampaignOwner,
   'GET /api/v1/campaign-owner': business.getMineOwner,
+  'GET /api/v1/business/campaigns': payouts.listBusinessCampaigns,
   'POST /api/v1/kyc/basic': business.kycBasic,
   'POST /api/v1/kyc/identity': business.kycIdentity,
+  'GET /api/v1/kyc/payout-account': payouts.getPayoutAccount,
+  'POST /api/v1/kyc/payout-account': payouts.savePayoutAccount,
+  'GET /api/plans': plans,
   'GET /api/admin/stats': admin.stats,
   'GET /api/admin/users': admin.listUsers,
   'GET /api/admin/tasks': admin.listTasksAdmin,
@@ -724,6 +848,8 @@ const DYNAMIC_ROUTES = [
   { method: 'POST', re: /^\/api\/admin\/campaigns\/([0-9a-f-]{36})\/confirm\/?$/i, params: ['id'], fn: admin.confirmCampaign },
   { method: 'POST', re: /^\/api\/admin\/campaign\/owners\/([0-9a-f-]{36})\/verify\/?$/i, params: ['id'], fn: admin.verifyCampaignOwner },
   { method: 'POST', re: /^\/api\/admin\/kyc\/([0-9a-f-]{36})\/verify\/?$/i, params: ['id'], fn: admin.verifyKycTier },
+  { method: 'POST', re: /^\/api\/v1\/campaigns\/([0-9a-f-]{36})\/payment-link\/?$/i, params: ['id'], fn: payouts.createPaymentLink },
+  { method: 'GET', re: /^\/api\/v1\/campaigns\/([0-9a-f-]{36})\/payments\/?$/i, params: ['id'], fn: payouts.listCampaignPayments },
 ];
 
 function resolveRoute(key) {

@@ -115,8 +115,12 @@ const routes = await import('../api/routes.mjs');
     'POST /api/v1/campaigns',
     'POST /api/v1/campaign-owners',
     'GET /api/v1/campaign-owner',
+    'GET /api/v1/business/campaigns',
     'POST /api/v1/kyc/basic',
     'POST /api/v1/kyc/identity',
+    'GET /api/v1/kyc/payout-account',
+    'POST /api/v1/kyc/payout-account',
+    'GET /api/plans',
     'GET /api/admin/campaign/owners',
     'GET /api/admin/kyc',
     'GET /api/admin/plugins',
@@ -139,6 +143,8 @@ const routes = await import('../api/routes.mjs');
     'POST /api/admin/campaigns/0b0e0000-0000-0000-0000-000000000001/confirm',
     'POST /api/admin/campaign/owners/0b0e0000-0000-0000-0000-000000000001/verify',
     'POST /api/admin/kyc/0b0e0000-0000-0000-0000-000000000001/verify',
+    'POST /api/v1/campaigns/0b0e0000-0000-0000-0000-000000000001/payment-link',
+    'GET /api/v1/campaigns/0b0e0000-0000-0000-0000-000000000001/payments',
   ]) {
     check(`dynamic route ${p} is registered`, typeof routes.routes[p] === 'function');
   }
@@ -194,6 +200,21 @@ const routes = await import('../api/routes.mjs');
 
   const noPin = await routes.verifyOtp({ body: { phone: '08030000000' }, headers: {} });
   check('OTP verify refuses without a pin', noPin.status === 400);
+
+  // the money surfaces must refuse an unauthenticated caller too
+  const payoutRead = await routes.routes['GET /api/v1/kyc/payout-account'](fakeReq({}));
+  check('GET /api/v1/kyc/payout-account refuses without a session', payoutRead.status === 401,
+    JSON.stringify(payoutRead));
+  const payoutWrite = await routes.routes['POST /api/v1/kyc/payout-account'](fakeReq({
+    legalName: 'Ada', bankName: 'GTB', bankCode: '058',
+    accountNumber: '0123456789', accountName: 'ADA OKORO',
+  }));
+  check('POST /api/v1/kyc/payout-account refuses without a session', payoutWrite.status === 401,
+    JSON.stringify(payoutWrite));
+  const bizCampaigns = await routes.routes['GET /api/v1/business/campaigns'](fakeReq({}));
+  check('GET /api/v1/business/campaigns refuses without a session', bizCampaigns.status === 401);
+  const planList = await routes.routes['GET /api/plans'](fakeReq({}));
+  check('GET /api/plans refuses without a session', planList.status === 401);
 }
 
 /* --------------------------------------------- OTP request -> verify wiring */

@@ -35,7 +35,8 @@
 
       <div class="panel" id="session-panel">
         <h2>Reviewer session</h2>
-        <p class="fine">Paste a signed-in reviewer session token. It stays in this browser and is sent only to this site.</p>
+        <p class="fine">This page expects a <strong>reviewer</strong> session token. It does not reuse the promoter sign-in used on the rest of the site: the token is kept under its own browser key (promota-reviewer-token), so a reviewer workstation stays separate from any promoter session in the same browser.</p>
+        <p class="fine">Paste a signed-in reviewer token. It stays in this browser and is sent only to this site.</p>
         <form id="session-form">
           <div>
             <label for="session-token">Session token</label>

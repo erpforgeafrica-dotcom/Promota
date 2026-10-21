@@ -38,6 +38,12 @@ jobs:
     timeout-minutes: 10
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      # The live service to verify. Override it with a repository variable
+      # named LIVE_SITE_URL when the service changes; the default below is the
+      # current live deployment (service gracious-peace, project
+      # attractive-rejoicing).
+      LIVE_SITE_URL: ${{ vars.LIVE_SITE_URL || 'https://gracious-peace-production-d056.up.railway.app' }}
 
     steps:
       - name: Checkout repository
@@ -49,7 +55,7 @@ jobs:
           node-version: '22'
 
       - name: Verify deployed site
-        run: node scripts/verifyLive.mjs https://web-production-045b1.up.railway.app
+        run: node scripts/verifyLive.mjs "$LIVE_SITE_URL"
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

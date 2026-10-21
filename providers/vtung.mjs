@@ -223,9 +223,12 @@ export async function recheck(reference, _providerRef, deps = {}) {
 export function verifyWebhook(rawBody, signature) {
   const pin = (process.env.VTU_USER_PIN || '').trim();
   if (!pin || !rawBody || !signature) return false;
-  const mac = createHmac('sha256', pin).update(rawBody);
-  const hex = mac.digest('hex');
-  const b64 = mac.digest('base64');
+  // One HMAC, two encodings. Calling digest() twice on the same Hash throws
+  // ("Digest already called"), which made every verification fail; compute the
+  // hex once and derive the base64 from the raw bytes.
+  const digest = createHmac('sha256', pin).update(rawBody).digest();
+  const hex = digest.toString('hex');
+  const b64 = digest.toString('base64');
   const given = String(signature).trim();
   const eq = (a, b) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
   try { return eq(hex, given.toLowerCase()) || eq(b64, given); } catch { return false; }

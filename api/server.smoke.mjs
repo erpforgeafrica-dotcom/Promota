@@ -89,9 +89,15 @@ try {
     check('/healthz reports termii configured', h.body.providers.termii === true);
     check('/healthz reports flutterwave configured', h.body.providers.flutterwave === true);
     check('/healthz reports sessions configured', h.body.auth === true);
-    check('/healthz admits data is NOT ready',
-      h.body.providers.data.ready === false && typeof h.body.providers.data.reason === 'string');
-    check('/healthz leaks no secret', !/sb_secret|FLWSECK|tlv__|SESSION_SECRET/.test(h.text));
+    // The data provider state is HONEST, not a fixed value: the assertion
+    // used to require ready === false, which was true before the aggregator
+    // was wired and false after it. What must always hold is that the
+    // endpoint states the position and names a reason when it is not ready.
+    const data = h.body.providers?.data || {};
+    check('/healthz reports the data provider position honestly',
+      typeof data.ready === 'boolean'
+      && (data.ready === true ? typeof data.provider === 'string' : typeof data.reason === 'string'),
+      JSON.stringify(data).slice(0, 200));    check('/healthz leaks no secret', !/sb_secret|FLWSECK|tlv__|SESSION_SECRET/.test(h.text));
   }
 
   /* ------------------------------------------------------------ API routing */

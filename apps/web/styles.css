@@ -699,3 +699,36 @@ a.blog-card:hover { border-color: var(--gold-dim); transform: translateY(-1px); 
 [data-theme="light"] .checkin-grid .dot       { background: rgba(0,0,0,.08); }
 [data-theme="light"] .checkin-grid .dot.hit   { background: var(--gold, #b8860b); }
 [data-theme="light"] .checkin-grid .dot.miss  { border-color: rgba(0,0,0,.2); }
+
+/* --- business + kyc additions --- */
+/* A .field groups one label with its control so a whole group (label +
+   select + hint) can be hidden or shown as one unit. */
+.field { display: block; }
+.field[hidden] { display: none; }
+
+#kyc-form, #business-form, #owner-form { display: grid; gap: 12px; max-width: 560px; }
+#kyc-form input, #kyc-form select,
+#business-form input, #business-form select, #business-form textarea,
+#owner-form input, #owner-form select {
+  background: var(--ink); border: 1px solid var(--line-strong); border-radius: 10px;
+  color: var(--text); padding: 10px 12px; font: inherit;
+}
+#business-form textarea { min-height: 96px; resize: vertical; }
+#business-form h3 { margin: 18px 0 0; font-size: 1rem; }
+
+.task-row {
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px; margin-top: 12px; background: var(--field-2);
+}
+.task-row .row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.task-row .row-head h3 { margin: 0; font-size: .95rem; }
+.task-row .row-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 720px) { .task-row .row-grid { grid-template-columns: 1fr; } }
+
+.paylink-box p { margin: 8px 0; }
+.paylink-box .fine { word-break: break-all; }
+
+/* --- cross links between the workspaces --- */
+/* The nav rows carry real links (business console, reviewer queue). They use
+   the .theme-btn look, so they must not read as underlined body text. */
+.nav-cta a.theme-btn { text-decoration: none; display: inline-block; }
