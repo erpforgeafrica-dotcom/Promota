@@ -182,6 +182,37 @@ Report, in this order:
    limitation that is stated is a controlled risk; a limitation that is
    hidden is a defect.
 
+## Traps this repo has actually hit
+
+These are not hypotheticals. Each one cost a session.
+
+1. **A tracked file referencing an untracked file breaks the build, not the
+   test.** `npm test` runs against the working tree, so a local green says
+   nothing about the repository. Before deploying, run
+   `git ls-files --others --exclude-standard` and compare it with the paths
+   `package.json`, the `Dockerfile` and CI refer to. A GitHub-sourced build
+   fails where the local run passed.
+2. **The Railway CLI session is global mutable state.** Another agent on the
+   same machine can re-link `~/.railway/config.json` mid-session. Run
+   `railway whoami` **immediately** before every state-changing command, not
+   once at the start. If the account changed, stop and restore it — never act
+   on the account that appears.
+3. **Apply the migrations before deploying the code that needs them.** The
+   readiness probe then reports `"database is at migration 17, repo ships
+   13"` for the short window in between. That 503 is the gate working: it
+   names the exact mismatch instead of crashing on a missing column.
+4. **A push to `main` does not necessarily build.** The Promota service has
+   no commit-status reporting on GitHub, so "pushed" is not "deployed".
+   Verify with the live URL, not with the push.
+5. **`revoke execute on function f() from anon, authenticated` does not
+   revoke.** PostgreSQL grants EXECUTE to `PUBLIC` on every new function.
+   Always `from public, anon, authenticated` **and**
+   `grant execute on function f() to service_role`, in the same migration.
+6. **Never edit an applied migration.** `0014`–`0016` were still unapplied
+   and could be corrected in place; `0008`, `0012` and `0013` were applied
+   and were fixed forward in `0017`. Check `/readyz` (repo vs applied) before
+   deciding which side of that line a file is on.
+
 ## Rollback
 
 If the live check fails:
