@@ -31,7 +31,8 @@ from the owner machine (`C:\Users\pc\HOSTINGER API KEY.txt` — path only).
 | **Hosting account** | `u515553672` | Same call |
 | **Runtime** | Node 22, entry `server.mjs`, git source `erpforgeafrica-dotcom/Promota@main` | Build settings via API |
 | **Env** | Core + provider allow-list from repo `.env` via `PUT …/env` | Script `putEnv()` |
-| **Health** | `https://promota.click/healthz` | verify after each build |
+| **Health** | `https://promota.click/healthz` | HTTP 200, config configured |
+| **Live verify** | `scripts/verifyLive.mjs https://promota.click` — PASS 19, FAIL 0, ALL HOLD (real lead submit + admin row confirmed) | 2026-10-24, commit `03fd5d9` |
 | **Git GitHub App** | installation `01a16c1d-7a43-70fc-a943-10885016dd9e` active | `GET /git/installations` 2026-10-24 |
 
 Railway (below) stays as the parallel/fallback production target.

@@ -84,9 +84,13 @@ const CORE = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEY', '
 
 async function putEnv() {
   const env = parseDotEnv();
-  const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'SESSION_SECRET', 'PAYOUT_ENCRYPTION_KEY'];
-  const missing = required.filter(k => !env[k]);
-  if (missing.length) throw new Error('.env missing required keys: ' + missing.join(', '));
+  const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SESSION_SECRET', 'PAYOUT_ENCRYPTION_KEY'];
+  const alternating = [['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY']];
+  const missing = required.filter(k => !env[k] && env[k] !== '');
+  const alternatesMissing = alternating.filter(alts => alts.every(k => env[k] === undefined));
+  if (missing.length || alternatesMissing.length) {
+    throw new Error(`.env missing required keys: ${[...missing, ...alternatesMissing.map(a => a.join(' OR '))].join(', ')}`);
+  }
   const env_vars = {};
   for (const k of CORE) if (env[k] !== undefined) env_vars[k] = env[k];
   env_vars.TRUST_PROXY_HOPS = env_vars.TRUST_PROXY_HOPS || '1';
@@ -142,7 +146,7 @@ async function latestMainSha() {
 }
 
 async function watch(uuid) {
-  const terminus = ['ready', 'done', 'success', 'failed', 'error', 'aborted', 'cancelled'];
+  const terminus = ['ready', 'done', 'completed', 'succeeded', 'success', 'failed', 'error', 'aborted', 'cancelled'];
   for (let i = 0; i < 90; i++) {
     await new Promise(r => setTimeout(r, 12000));
     const build = await api('GET', '/accounts/' + USER + '/websites/' + DOMAIN + '/nodejs/builds/' + uuid);
