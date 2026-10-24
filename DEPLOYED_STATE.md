@@ -11,12 +11,30 @@ Per Team C recommendation: "Add a DEPLOYED_STATE.md triage record."
 | Aspect | Value | Status |
 |---|---|---|
 | **Local repo name** | `owoworks` | Directory name |
-| **Git remote (origin)** | `https://github.com/erpforgeafrica-dotcom/OwoWorks.git` | **Canonical remote** |
+| **Git remote (origin)** | `https://github.com/erpforgeafrica-dotcom/Promota.git` | **Canonical remote** (verified `git remote -v` 2026-10-24; the earlier `OwoWorks.git` note is stale) |
 | **Brand name** | `Promota` | Product brand |
-| **GitHub repo (deployed)** | `erpforgeafrica-dotcom/OwoWorks` | Pushed as `OwoWorks` |
+| **GitHub repo (deployed)** | `erpforgeafrica-dotcom/Promota` | Pushed as `Promota` |
 | **Branch** | `main` | Default |
 
-**Note:** The repository was created as `OwoWorks` (prior brand). The product is rebranded to `Promota`. The GitHub remote remains `OwoWorks` for continuity. All code, docs, and deployment artifacts reference `Promota` as the product brand.
+---
+
+## Deployed State (Hostinger — promota.click)
+
+Added 2026-10-24. Full app (server.mjs + api/ + apps/web/ + providers/) on
+Hostinger managed Node.js. Procedure: `docs/DEPLOY-HOSTINGER.md`, the
+repository script `scripts/deploy-hostinger.mjs` reads the API token file
+from the owner machine (`C:\Users\pc\HOSTINGER API KEY.txt` — path only).
+
+| Aspect | Value | Verified |
+|---|---|---|
+| **Domain** | `promota.click` | Live API `GET /api/hosting/v1/websites` 2026-10-24 |
+| **Hosting account** | `u515553672` | Same call |
+| **Runtime** | Node 22, entry `server.mjs`, git source `erpforgeafrica-dotcom/Promota@main` | Build settings via API |
+| **Env** | Core + provider allow-list from repo `.env` via `PUT …/env` | Script `putEnv()` |
+| **Health** | `https://promota.click/healthz` | verify after each build |
+| **Git GitHub App** | installation `01a16c1d-7a43-70fc-a943-10885016dd9e` active | `GET /git/installations` 2026-10-24 |
+
+Railway (below) stays as the parallel/fallback production target.
 
 ---
 
