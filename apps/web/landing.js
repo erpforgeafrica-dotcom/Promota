@@ -51,6 +51,21 @@
   var pendingPinId = '';
   var busy = false;
 
+  /* Capture a same-origin return destination so signing in from a gated page
+     (admin, business, dashboard) sends the user back there instead of always
+     to /dashboard.html. Only a relative path is accepted — no protocol, no
+     host — so this cannot be used as an open redirect. */
+  var next = '';
+  (function captureNext() {
+    try {
+      var m = /[?&]next=([^&]+)/.exec(location.search || '');
+      if (m) {
+        var cand = decodeURIComponent(m[1]);
+        if (/^\/[a-zA-Z0-9_./-]*$/.test(cand)) next = cand;
+      }
+    } catch (e) { /* next stays empty */ }
+  })();
+
   function say(message, isError) {
     if (!statusEl) return;
     statusEl.textContent = message || '';
@@ -107,7 +122,7 @@
     var requested = el.getAttribute('data-auth');
     if (requested === 'dashboard') {
       e.preventDefault();
-      window.location.href = '/dashboard.html';
+      window.location.href = next || '/dashboard.html';
       return;
     }
     openModal(requested || 'login');
@@ -132,7 +147,7 @@
       window.PromotaAuth.verifyOtp(pendingPhone, pendingPinId, pin).then(function (r) {
         if (r.status === 200 && r.body && r.body.token) {
           say('Signed in. Opening your dashboard…');
-          window.location.href = '/dashboard.html';
+          window.location.href = next || '/dashboard.html';
           return;
         }
         busy = false;
@@ -179,6 +194,7 @@
 
   /* ---------- signed-in state: nav buttons become a dashboard link ---------- */
   if (window.PromotaAuth.getToken()) {
+    var signedInTarget = next || '/dashboard.html';
     ['login-btn', 'login-cta', 'final-cta', 'login-m', 'signup-btn', 'signup-cta', 'signup-m'].forEach(function (id) {
       var b = document.getElementById(id);
       if (!b) return;
