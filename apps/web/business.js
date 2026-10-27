@@ -51,16 +51,10 @@
   ];
 
   var ACTION_TYPES = [
-    { value: 'post', label: 'Post' },
-    { value: 'like', label: 'Like' },
-    { value: 'comment', label: 'Comment' },
-    { value: 'follow', label: 'Follow' },
-    { value: 'subscribe', label: 'Subscribe' },
-    { value: 'repost', label: 'Repost' },
-    { value: 'share', label: 'Share' },
-    { value: 'view', label: 'View' },
-    { value: 'join_channel', label: 'Join channel' },
-    { value: 'review', label: 'Review' }
+    { value: 'post', label: 'Original post (disclosed)' },
+    { value: 'repost', label: 'Repost brand content (disclosed)' },
+    { value: 'share', label: 'Share brand content (disclosed)' },
+    { value: 'review', label: 'Review — product received' }
   ];
 
   var campaigns = [];
@@ -449,6 +443,7 @@
     if (opts.max != null) el.setAttribute('max', String(opts.max));
     if (opts.step != null) el.setAttribute('step', String(opts.step));
     if (opts.inputmode) el.setAttribute('inputmode', opts.inputmode);
+    if (opts.value != null) el.value = String(opts.value);
     if (opts.required) el.required = true;
     wrap.appendChild(lab);
     wrap.appendChild(el);
@@ -498,9 +493,34 @@
       dataField: 'trackedLink', maxlength: 500, required: true,
       placeholder: 'https://… the tracked link'
     }));
-    grid.appendChild(makeField('Action type', 'task-action-' + n, 'select', {
+    var actionField = makeField('Action type', 'task-action-' + n, 'select', {
       dataField: 'actionType', items: ACTION_TYPES
+    });
+    grid.appendChild(actionField);
+    grid.appendChild(makeField('Disclosure tag', 'task-disclosure-' + n, 'text', {
+      dataField: 'disclosureTag', maxlength: 40, value: '#ad',
+      placeholder: '#ad'
     }));
+    var purchaseField = makeField('Product received by the promoter?', 'task-purchase-' + n, 'checkbox', {
+      dataField: 'verifiedPurchase'
+    });
+    grid.appendChild(purchaseField);
+
+    /* Only a review can be paid for, so only a review may ask for proof of
+       purchase. Hiding the box on every other action keeps a business from
+       ticking a condition that does not apply. */
+    var actionSelect = actionField.querySelector('[data-f="actionType"]');
+    var purchaseBox = purchaseField.querySelector('[data-f="verifiedPurchase"]');
+    function syncPurchaseField() {
+      var isReview = !!actionSelect && actionSelect.value === 'review';
+      purchaseField.hidden = !isReview;
+      if (purchaseBox) {
+        purchaseBox.disabled = !isReview;
+        if (!isReview) purchaseBox.checked = false;
+      }
+    }
+    if (actionSelect) actionSelect.addEventListener('change', syncPurchaseField);
+    syncPurchaseField();
     grid.appendChild(makeField('Points', 'task-points-' + n, 'number', {
       dataField: 'points', min: 0, step: 1, inputmode: 'numeric', placeholder: 'Optional'
     }));
@@ -537,8 +557,11 @@
       var t = {
         caption: rowValue(rows[i], 'caption'),
         trackedLink: rowValue(rows[i], 'trackedLink'),
-        actionType: rowValue(rows[i], 'actionType') || 'post'
+        actionType: rowValue(rows[i], 'actionType') || 'post',
+        disclosureTag: rowValue(rows[i], 'disclosureTag') || '#ad'
       };
+      var purchase = rows[i].querySelector('[data-f="verifiedPurchase"]');
+      if (purchase && purchase.checked) t.verifiedPurchase = true;
       var pts = rowValue(rows[i], 'points');
       if (pts !== '') t.points = Number(pts);
       var views = rowValue(rows[i], 'viewsRequired');

@@ -100,3 +100,23 @@ raw command output + artifact hashes), plus `PROOF/C3-railway-live/` for the dep
 | `apps/web/assets/identity/og-image.png` | 1200×630 | read back via sharp metadata |
 | `apps/web/assets/identity/favicon-180.png` | 180×180 | read back via sharp metadata |
 | `apps/web/assets/identity/banner-dark.png` / `banner-light.png` | 1600×480 | read back via sharp metadata |
+
+## Platform-policy gate (2026-10-26)
+
+Promota no longer sells paid likes, comments, follows, subscribes, views, paid
+shares of a specific post or channel joins. The product sells disclosed content,
+brand-content posts and verified-purchase reviews only. Enforcement is in Postgres (`0018_task_policy_gate.sql`),
+the API (`api/business.mjs`, `api/routes.mjs`) and both consoles.
+
+| Claim | Evidence |
+|---|---|
+| Policy gate holds locally | `node db/policy.test.mjs` � 35 PASS / 0 FAIL |
+| Existing suites still hold | `npm test` chain � ledger 56/0, leads 41/0, points 59/0, redemption 13/0, views 17/0, api 90/0, providers 34/0 + 21/0, phone 17/0, lead 24/0, image 7/0 |
+| Site integrity | `node scripts/checkSite.mjs` � 187 PASS / 0 FAIL (the 3 `?next=` false positives are fixed) |
+| Live Supabase | **NOT APPLIED** � repo ships 18 migrations, live ledger max is 17. `predeploy-check` is NO-GO until `npm run db:remote` runs with owner approval. |
+| Hostinger | **NOT REDEPLOYED** � pending the migration above. |
+
+**Verdict:** the policy risk is closed in code. The live database and the Hostinger
+deployment are the two owner-gated steps left. Report:
+`audit/PROMOTA-PLATFORM-POLICY-REVIEW.md`; operating model:
+`docs/CREATOR-DELIVERY-PROTOCOL.md`.

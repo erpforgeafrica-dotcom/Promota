@@ -26,11 +26,42 @@ const fail = (message, status = 400, extra = {}) => ({ status, body: { error: me
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
-/** Engagement actions: what the promoter actually does on the platform. */
-export const CAMPAIGN_ACTIONS = [
-  'post', 'like', 'comment', 'follow', 'subscribe',
-  'repost', 'share', 'view', 'join_channel', 'review',
+/**
+ * Delivery actions Promota may sell.
+ *
+ * Paid likes, comments, follows, subscribes, views, channel joins and
+ * shared-link reposts are prohibited engagement on Meta, TikTok, YouTube,
+ * X and LinkedIn, and FTC 16 CFR Part 465 bans buying or selling fake
+ * social-media indicators. The database gate in 0018 enforces the same
+ * list; this constant exists so the API can refuse with a clear message
+ * before the insert is attempted.
+ */
+export const CAMPAIGN_ACTIONS = ['post', 'repost', 'share', 'review'];
+
+/** The only delivery classes the product may sell. */
+export const TASK_POLICY = {
+  post: 'content',
+  repost: 'distribution',
+  share: 'distribution',
+  review: 'review',
+};
+
+/** Actions that are refused outright. Kept named so the refusal is honest. */
+export const PROHIBITED_ACTIONS = [
+  'like', 'comment', 'follow', 'subscribe', 'view', 'join_channel',
 ];
+
+/** Must equal current_task_policy_version() in migration 0018. */
+export const TASK_POLICY_VERSION = '2026-10-26';
+
+const ACTION_LABELS = {
+  post: 'Original post',
+  repost: 'Brand content post',
+  share: 'Brand content post',
+  review: 'Verified-purchase review',
+};
+
+const DISCLOSURE_RE = /^#[A-Za-z0-9_]{2,30}$/;
 
 /** Campaign objective: the business intent behind the campaign. 'repost'
  *  pays through the rated-repost flow: a reviewer scores the submission
@@ -80,15 +111,22 @@ const mapOwner = (o) => ({
   createdAt: o.created_at,
 });
 
-const mapTaskInput = (t) => ({
-  caption: t.caption,
-  trackedLink: t.tracked_link,
-  disclosureTag: t.disclosure_tag,
-  actionType: t.action_type,
-  points: t.points_awarded ?? null,
-  rewardMinor: t.reward_minor,
-  viewsRequired: t.views_required ?? null,
-});
+const mapTaskInput = (t) => {
+  const actionType = t.action_type ?? t.actionType ?? 'post';
+  return {
+    caption: t.caption,
+    trackedLink: t.tracked_link ?? t.trackedLink ?? null,
+    disclosureTag: t.disclosure_tag ?? t.disclosureTag ?? null,
+    actionType,
+    policyClass: t.policy_class ?? t.policyClass ?? TASK_POLICY[actionType] ?? null,
+    attributionCode: t.attribution_code ?? t.attributionCode ?? null,
+    releaseAt: t.release_at ?? t.releaseAt ?? null,
+    verifiedPurchaseRequired: t.review_verified_purchase ?? t.verifiedPurchase ?? false,
+    points: t.points_awarded ?? t.points ?? null,
+    rewardMinor: t.reward_minor ?? t.rewardMinor ?? null,
+    viewsRequired: t.views_required ?? t.viewsRequired ?? null,
+  };
+};
 
 /* ------------------------------------------------- campaign-owner verification */
 
@@ -221,20 +259,40 @@ export async function createCampaignSelfServe(req) {
     const actionType = trim(t?.actionType, 24) || 'post';
     const points = num(t?.points);
     const viewsRequired = num(t?.viewsRequired);
+    const disclosureTag = trim(t?.disclosureTag, 40) || '#ad';
+    const releaseRaw = String(t?.releaseAt ?? '').trim();
+    const releaseAt = releaseRaw ? new Date(releaseRaw) : null;
     return {
       caption,
       trackedLink,
       actionType,
-      disclosureTag: trim(t?.disclosureTag, 40) || '#ad',
+      disclosureTag,
       points: points && points > 0 ? points : null,
       viewsRequired: viewsRequired != null ? Math.min(viewsRequired, 2_000_000_000) : null,
+      verifiedPurchase: t?.verifiedPurchase === true,
+      releaseAt: releaseAt && !Number.isNaN(releaseAt.getTime()) ? releaseAt.toISOString() : null,
     };
   });
   for (const t of cleaned) {
     if (!t.caption) return fail('every task needs a caption');
     if (!t.trackedLink) return fail('every task needs a tracked link (https)');
+    if (PROHIBITED_ACTIONS.includes(t.actionType)) {
+      return fail(
+        `"${t.actionType}" is not offered. Paid likes, comments, follows, subscribes, views, `
+        + 'paid sharing of a specific post or link, and channel joins are prohibited '
+        + 'engagement on every platform we serve. '
+        + `Use one of: ${CAMPAIGN_ACTIONS.join(', ')}.`,
+        422,
+      );
+    }
     if (!CAMPAIGN_ACTIONS.includes(t.actionType)) {
       return fail(`task actionType must be one of: ${CAMPAIGN_ACTIONS.join(', ')}`);
+    }
+    if (!DISCLOSURE_RE.test(t.disclosureTag)) {
+      return fail('disclosureTag must be a single tag such as #ad or #sponsored');
+    }
+    if (t.actionType === 'review' && !t.verifiedPurchase) {
+      return fail('a review task requires verifiedPurchase: true — the creator must have received the product', 422);
     }
     if (t.points && t.points > 100000) return fail('a task cannot pay more than 100000 points');
   }
@@ -272,6 +330,10 @@ export async function createCampaignSelfServe(req) {
     tracked_link: t.trackedLink,
     disclosure_tag: t.disclosureTag,
     action_type: t.actionType,
+    policy_class: TASK_POLICY[t.actionType],
+    policy_version: TASK_POLICY_VERSION,
+    review_verified_purchase: t.verifiedPurchase,
+    release_at: t.releaseAt || new Date().toISOString(),
     points_awarded: t.points,
     reward_minor: pricePerOutcomeMinor,
     views_required: t.viewsRequired,
@@ -290,6 +352,59 @@ export async function createCampaignSelfServe(req) {
     tasks: cleaned.map(mapTaskInput),
     nextStep: 'await admin confirm, then fund escrow before it can go live',
   }, 201);
+}
+
+/* ------------------------------------------------------------ task policy */
+
+/**
+ * GET /api/policy — the delivery policy the dashboard renders and the
+ * version a creator must acknowledge before claim_task() will assign work.
+ */
+export async function getTaskPolicy(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+
+  const rows = await sb.select('profiles', `id=eq.${auth.sub}&select=policy_ack_version,policy_ack_at`);
+  const profile = rows?.[0] || {};
+
+  return ok({
+    version: TASK_POLICY_VERSION,
+    acknowledged: profile.policy_ack_version === TASK_POLICY_VERSION,
+    acknowledgedAt: profile.policy_ack_at || null,
+    allowedActions: CAMPAIGN_ACTIONS.map((value) => ({
+      value,
+      policyClass: TASK_POLICY[value],
+      label: ACTION_LABELS[value],
+    })),
+    prohibitedActions: PROHIBITED_ACTIONS,
+    rules: [
+      'Paid content must be disclosed with the campaign tag and the platform branded-content toggle where the platform has one.',
+      'Never post the same link in bulk: each task carries its own attribution code.',
+      'A review is only offered for a product the creator actually received, and the payment never depends on it being positive.',
+      'No passwords, no automation, no scraping, no platform credentials — ever.',
+    ],
+  });
+}
+
+/** POST /api/policy/ack { version } — recorded once per policy version. */
+export async function ackTaskPolicy(req) {
+  const auth = await requireSession(req);
+  if (!auth) return fail('sign in required', 401);
+
+  const version = String(req.body?.version ?? '').trim();
+  if (version !== TASK_POLICY_VERSION) {
+    return fail(`the current policy is version ${TASK_POLICY_VERSION}; reload before acknowledging`, 409, {
+      version: TASK_POLICY_VERSION,
+    });
+  }
+
+  try {
+    await sb.rpc('ack_task_policy', { p_profile: auth.sub, p_version: version });
+  } catch (e) {
+    return fail(`acknowledgement refused: ${String(e.message || e).slice(0, 160)}`, 400);
+  }
+
+  return ok({ acknowledged: true, version, acknowledgedAt: new Date().toISOString() });
 }
 
 /* ------------------------------------------------------------------ kyc */

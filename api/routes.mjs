@@ -141,8 +141,10 @@ export async function listTasks(req) {
 
   const rows = await sb.select(
     'tasks',
-    `campaign_id=in.(${ids.join(',')})&state=eq.draft`
-    + '&select=id,campaign_id,caption,tracked_link,disclosure_tag,action_type,'
+    `campaign_id=in.(${ids.join(',')})&state=eq.draft&policy_class=neq.prohibited`
+    + `&release_at=lte.${encodeURIComponent(new Date().toISOString())}`
+    + '&select=id,campaign_id,caption,tracked_link,disclosure_tag,action_type,policy_class,'
+    + 'attribution_code,release_at,review_verified_purchase,'
     + 'points_awarded,reward_minor,views_required,screenshot_url&order=created_at.desc&limit=50'
   );
 
@@ -154,6 +156,10 @@ export async function listTasks(req) {
       trackedLink: t.tracked_link,
       disclosureTag: t.disclosure_tag,
       actionType: t.action_type || 'post',
+      policyClass: t.policy_class || 'content',
+      attributionCode: t.attribution_code || null,
+      releaseAt: t.release_at || null,
+      verifiedPurchaseRequired: t.review_verified_purchase === true,
       points: t.points_awarded ?? null,
       rewardMinor: t.reward_minor,
       viewsRequired: t.views_required ?? null,
@@ -171,6 +177,7 @@ export async function myTasks(req) {
   const rows = await sb.select(
     'tasks',
     `assigned_to=eq.${auth.sub}&select=id,campaign_id,caption,tracked_link,disclosure_tag,`
+    + 'action_type,policy_class,attribution_code,release_at,'
     + 'points_awarded,state,proof_url,submitted_at,auto_approve_at,rejection_reason&order=created_at.desc&limit=100'
   );
 
@@ -181,6 +188,10 @@ export async function myTasks(req) {
       caption: t.caption,
       trackedLink: t.tracked_link,
       disclosureTag: t.disclosure_tag,
+      actionType: t.action_type || 'post',
+      policyClass: t.policy_class || 'content',
+      attributionCode: t.attribution_code || null,
+      releaseAt: t.release_at || null,
       points: t.points_awarded ?? null,
       state: t.state,
       proofUrl: t.proof_url,
@@ -204,15 +215,36 @@ export async function claimTask(req, params) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return fail('a task id is required');
 
   try {
-    const claimed = await sb.rpc('claim_task', { p_task: id, p_profile: auth.sub });
+    await sb.rpc('claim_task', { p_task: id, p_profile: auth.sub });
+    const [task] = await sb.select(
+      'tasks',
+      `id=eq.${id}&select=assigned_at,policy_class,attribution_code,release_at,disclosure_tag`
+    );
     return ok({
       claimed: true,
       taskId: id,
-      assignedAt: claimed?.assigned_at ?? null,
+      assignedAt: task?.assigned_at ?? null,
+      policyClass: task?.policy_class ?? null,
+      attributionCode: task?.attribution_code ?? null,
+      disclosureTag: task?.disclosure_tag ?? null,
+      releaseAt: task?.release_at ?? null,
     });
   } catch (e) {
     const m = String(e.message || e);
     if (/no longer available|not in state draft/i.test(m)) return fail('that task has already been claimed', 409);
+    if (/acknowledge the creator delivery policy/i.test(m)) {
+      return fail('acknowledge the creator delivery policy before claiming a task', 403, {
+        code: 'policy_ack_required',
+      });
+    }
+    if (/prohibited by platform policy|not offered/i.test(m)) {
+      return fail('this task is no longer offered: paid engagement of this type is prohibited', 410, {
+        code: 'policy_prohibited',
+      });
+    }
+    if (/verified purchase/i.test(m)) return fail('this review task needs a verified purchase', 409);
+    if (/not released yet/i.test(m)) return fail('this task has not been released yet', 409);
+    if (/already hold a task/i.test(m)) return fail('finish your current task from this campaign first', 409);
     return fail(`claim refused: ${m.slice(0, 140)}`, 400);
   }
 }
@@ -788,6 +820,8 @@ const exactRoutes = {
   'GET /api/me': me,
   'GET /api/tasks': listTasks,
   'GET /api/tasks/mine': myTasks,
+  'GET /api/policy': business.getTaskPolicy,
+  'POST /api/policy/ack': business.ackTaskPolicy,
   'POST /api/redeem': redeem,
   'GET /api/referrals': referrals,
   'POST /api/webhooks/flutterwave': flutterwaveWebhook,

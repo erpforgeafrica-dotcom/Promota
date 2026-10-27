@@ -33,8 +33,9 @@ apps/web/          vanilla JS frontend: landing + OTP sign-in, promoter
 api/               production API: OTP sessions, tasks, redeem, referrals, worker
 providers/         Termii (SMS/OTP), Flutterwave (bank transfers), data.mjs +
                    dataManager.mjs (twenty5 -> vtung failover), payoutCrypto.mjs
-db/migrations/     Supabase schema 0001-0016: RBAC, ledger, escrow, tasks,
-                   payouts, disputes, points/levels, competitions, RLS
+db/migrations/     Supabase schema 0001-0018: RBAC, ledger, escrow, tasks,
+                   payouts, disputes, points/levels, competitions, RLS,
+                   platform-policy gate for creator delivery
 scripts/           site checker, preview server, identity exporter, image guard
 apps/web/assets/identity/   SVG masters + verified PNG exports + DESIGN_BRIEF.json
 docs/              BRAND.md, BRAND-SKILLS.md, LEAD-CAPTURE.md, USER-GUIDE.md, ADMIN-GUIDE.md
@@ -51,6 +52,12 @@ docs/              BRAND.md, BRAND-SKILLS.md, LEAD-CAPTURE.md, USER-GUIDE.md, AD
   business console (`business.html`: owner verification, campaign creation,
   payment link, payments), the admin console (`admin.html`) and the reviewer
   queue (`approval-queue.html`).
+- **Platform-policy gate (0018):** Promota sells disclosed content, brand-content
+  posts and verified-purchase reviews only. Paid likes, comments, follows,
+  subscribes, views, paid shares of a specific post and channel joins are
+  refused in Postgres, in the API and in both consoles. See
+  `audit/PROMOTA-PLATFORM-POLICY-REVIEW.md` and
+  `docs/CREATOR-DELIVERY-PROTOCOL.md`.
 - **Not built:** the partner portal.
 - **Blocked on external providers/owner decisions:** Termii API key (SMS),
   the data-provider credentials behind the twenty5/vtung failover

@@ -59,7 +59,13 @@ for (const f of html) {
   // and is created at deploy time, never committed. Without it the form says
   // it is not connected; it never fakes a successful sign-up.
   const required = assets.filter(u => u !== 'config.js');
-  const missing = [...new Set(required.filter(u => !existsSync(join(WWW, u))))];
+  const missing = [...new Set(required.filter(u => {
+    // A query string is not part of the file path: /?next=/admin.html is the
+    // landing page with a return destination, not a missing asset.
+    const pathname = u.split('?')[0].split('#')[0];
+    if (!pathname || pathname === '/') return false;
+    return !existsSync(join(WWW, pathname.replace(/^\/+/, '')));
+  }))];
   if (missing.length) bad('local assets', `missing: ${missing.join(', ')}`);
   else if (required.length) ok(`${required.length} local asset(s) exist (+ optional config.js)`);
 

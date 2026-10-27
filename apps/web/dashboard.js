@@ -110,8 +110,10 @@
   }
 
   var ACTION_LABEL = {
-    post: 'Post', like: 'Like', comment: 'Comment', follow: 'Follow', subscribe: 'Subscribe',
-    repost: 'Repost', share: 'Share', view: 'Watch', join_channel: 'Join the channel', review: 'Review',
+    post: 'Original post', repost: 'Brand content post', share: 'Brand content post',
+    review: 'Verified-purchase review',
+    like: 'Like (legacy)', comment: 'Comment (legacy)', follow: 'Follow (legacy)',
+    subscribe: 'Subscribe (legacy)', view: 'Watch (legacy)', join_channel: 'Join the channel (legacy)',
   };
 
   function taskCard(t, actionsHtml) {
@@ -119,15 +121,86 @@
     var asset = (t.campaignAssets && t.campaignAssets[0])
       ? '<p>Creative: <a href="' + esc(t.campaignAssets[0]) + '" target="_blank" rel="noopener noreferrer">open asset</a></p>'
       : '';
+    var code = t.attributionCode
+      ? '<p class="fine">Your attribution code: <code>' + esc(t.attributionCode) + '</code> — use it on your own post, never a shared Promota link.</p>'
+      : '';
+    var legacy = t.policyClass === 'prohibited'
+      ? '<p class="fine">This task is legacy and is no longer offered for claiming.</p>'
+      : '';
     return '<article class="panel task-card">' +
       '<div class="task-head"><h3>' + esc(t.caption || 'Untitled task') + '</h3>' + badge(t.state) + '</div>' +
-      '<p>' + (t.trackedLink ? 'Tracked link: <a href="' + esc(t.trackedLink) + '" target="_blank" rel="noopener noreferrer">' + esc(t.trackedLink) + '</a>' : '') + '</p>' +
-      asset +
+      '<p>' + (t.trackedLink ? 'Business link: <a href="' + esc(t.trackedLink) + '" target="_blank" rel="noopener noreferrer">' + esc(t.trackedLink) + '</a>' : '') + '</p>' +
+      asset + code + legacy +
       '<p class="fine">Action: ' + esc(ACTION_LABEL[t.actionType] || (t.actionType || 'Post')) + views +
       ' · Disclosure: ' + esc(t.disclosureTag || '#ad') + ' · Worth ' + (t.points != null ? esc(String(t.points)) + ' points' : 'a reward') +
       (t.rewardMinor ? ' (' + naira(t.rewardMinor) + ')' : '') + '</p>' +
       (actionsHtml || '') +
       '</article>';
+  }
+
+  var policyState = { version: null, acknowledged: false, loaded: false };
+
+  function renderPolicy(p) {
+    var host = document.getElementById('policy-panel');
+    if (!host) return;
+    var acked = policyState.acknowledged
+      ? '<p class="fine">Policy version ' + esc(policyState.version || '') + ' acknowledged.</p>'
+      : '<label class="policy-ack"><input type="checkbox" id="policy-ack"> '
+        + 'I will disclose every paid post and follow each platform\'s rules.</label>';
+    host.innerHTML = '<h2>Creator delivery policy</h2>'
+      + '<p class="fine">Promota pays for disclosed content, brand-content posts and verified-purchase reviews. '
+      + 'It does not sell likes, follows, views, comments, subscribes or channel joins.</p>'
+      + acked;
+  }
+
+  function loadPolicy() {
+    return Auth.api('/api/policy').then(function (r) {
+      if (r.status !== 200 || !r.body) return;
+      policyState = {
+        version: r.body.version || null,
+        acknowledged: r.body.acknowledged === true,
+        loaded: true
+      };
+      renderPolicy(r.body);
+    });
+  }
+
+  function claimFailed(box, msg, btn) {
+    if (btn) btn.disabled = false;
+    if (box) { box.textContent = msg; box.className = 'form-status error'; }
+    FB && FB.err(msg);
+  }
+
+  function attemptClaim(id, btn, box, allowAckRetry) {
+    Auth.api('/api/tasks/' + encodeURIComponent(id) + '/claim', { method: 'POST' }).then(function (r) {
+      if (r.status === 200) {
+        if (box) { box.textContent = 'Task claimed — finish it under "my tasks".'; box.className = 'form-status ok'; }
+        FB && FB.ok('Task claimed — finish it under My tasks.');
+        loadTasks();
+        loadMine();
+        return;
+      }
+      if (allowAckRetry && r.body && r.body.code === 'policy_ack_required') {
+        var ack = document.getElementById('policy-ack');
+        if (!ack || !ack.checked) {
+          claimFailed(box, 'Tick the creator delivery policy box first.', btn);
+          return;
+        }
+        Auth.api('/api/policy/ack', {
+          method: 'POST',
+          body: { version: policyState.version || r.body.version }
+        }).then(function (a) {
+          if (a.status === 200) {
+            policyState.acknowledged = true;
+            attemptClaim(id, btn, box, false);
+          } else {
+            claimFailed(box, (a.body && a.body.error) || 'Could not record the policy acknowledgement.', btn);
+          }
+        });
+        return;
+      }
+      claimFailed(box, (r.body && r.body.error) || 'Could not claim the task.', btn);
+    });
   }
 
   function renderTasks(status, listEl, tasks) {
@@ -149,18 +222,7 @@
         var id = form.getAttribute('data-task');
         var btn = form.querySelector('button');
         if (btn) btn.disabled = true;
-        Auth.api('/api/tasks/' + encodeURIComponent(id) + '/claim', { method: 'POST' }).then(function (r) {
-          if (r.status === 200) {
-            if (box) { box.textContent = 'Task claimed — finish it under "my tasks".'; box.className = 'form-status ok'; }
-            FB && FB.ok('Task claimed — finish it under My tasks.');
-            loadTasks();
-            loadMine();
-            return;
-          }
-          if (btn) btn.disabled = false;
-          if (box) { box.textContent = (r.body && r.body.error) || 'Could not claim the task.'; box.className = 'form-status error'; }
-          FB && FB.err((r.body && r.body.error) || 'Could not claim the task.');
-        });
+        attemptClaim(id, btn, box, true);
       });
     });
     if (box) box.textContent = '';
@@ -572,6 +634,7 @@
     redeemPaneBind();
     if (window.PromotaKyc && window.PromotaKyc.bind) window.PromotaKyc.bind();
     return Promise.all([
+      loadPolicy(),
       loadTasks(),
       loadMine(),
       loadMoney(),
