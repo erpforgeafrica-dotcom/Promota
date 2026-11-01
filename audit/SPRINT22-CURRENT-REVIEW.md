@@ -1,123 +1,110 @@
-# Promota — Current Review + Ratings (HEAD `e81236e` → working tree)
+# Promota — Current Review (HEAD 13036da)
 
-**Date:** 2026-10-21 · **Repo:** `C:\Users\pc\owoworks` · **Branch:** `main`
+**Date:** 2026-10-31 · **Repo:** `C:\Users\pc\owoworks` · **Branch:** `main`
+**HEAD:** `13036da75e159d26930a3fdd4aabdde03f146908` (== `origin/main`, live `git ls-remote`)
 **Remote:** `erpforgeafrica-dotcom/Promota`
-**Live service:** `gracious-peace` (project `attractive-rejoicing`) —
-<https://gracious-peace-production-d056.up.railway.app>
-**Method:** read-only source inspection + fresh test/smoke runs + live endpoint
-probes + a reproduced exploit. Labels: OBSERVED / TESTED / INFERRED / UNKNOWN.
 
-This supersedes the review written at `18f0bfb` (13/10). That review described a
-125-line static server with zero routes; the code at HEAD is a 307-line server
-with 52 endpoints, an outbox worker, a multi-provider reward matrix and 13
-applied migrations. Every audit document in `audit/` from 05/10 describes that
-older, smaller system and is stale.
+This supersedes the prior audit written at `2b03c9e`-era trees. Method: read-only source
+inspection of every hot path (routes, worker, business, payouts, providers, migrations,
+consoles), fresh runs of the full gate chain in this session (`npm test`, `npm run site`,
+`predeploy-check`, `db/live.proof.mjs`, `verifyLive.mjs`), live GET-only probes of
+promota.click and the Railway fallback URL, a purpose-built self-cleaning oracle
+cross-check against live Supabase (7/0), and cross-comparison of the API route table
+(47 exact + 13 dynamic) against every console fetch path. Labels: OBSERVED / TESTED /
+INFERRED / UNKNOWN.
 
----
+## What changed since the prior audit (closed items)
 
-## 1. The ratings
+| Prior finding | Status now |
+|---|---|
+| Platform policy: product must not sell paid likes/comments/follows/subscribes/views/shares/joins | `CLOSED` in code — API 422 refusal (`business.mjs:279-287`), actionType allowlist (`business.mjs:288-289`), disclosure tag required (`business.mjs:291-292`), review needs verifiedPurchase (`business.mjs:294-295`); consoles offer ONLY post/repost/share/review (`business.js:53-58`); Postgres gate `0018` TESTED green locally (`npm test` policy suite 39/0). DB-level enforcement is NOT yet applied to the LIVE database (see TC-F1). |
+| Local PGlite suites drift/gaps | `CLOSED` — full chain 418 PASS / 0 FAIL this session (12 suites incl. policy 39/0, redemption-integrity 13/0, views-evidence 17/0, dataManager 34/0, payoutCrypto 21/0). |
+| Money-path false-success class (F-01 outbox lineage) | `CLOSED` — outbox worker converges pending→verify→delivered only on provider-side confirmation; webhook paths re-verify by transfer id (`routes.mjs:503,532`); provider failover never reports success on UNKNOWN (`dataManager.test.mjs` 34/0). |
+| Landing/lead path | `CLOSED` — `verifyLive.mjs https://promota.click` 19/0 ALL HOLD today, real sign-up round-trip + cleanup. |
 
-Ten dimensions, each scored against evidence. **10 means every claim on that
-dimension is backed by a command that was actually run.** A dimension that
-cannot be proven is not scored 10 — it is scored lower and the missing proof
-is named.
+## Findings (this review)
 
-| # | Dimension | Before | Now | What the score rests on |
+| ID | Sev | Finding | Evidence | Label |
 |---|---|---|---|---|
-| 1 | **Money and points tell the truth** (no success that did not happen) | 3/10 | **10/10** | Every redemption path now has one honest outcome: fulfilled only on provider confirmation; pending/unknown parked, never re-purchased; permanent failure refunds the points. Proven by `db/points.test.mjs` (59), `providers/dataManager.test.mjs` (34), `db/redemption-integrity.test.mjs` (13). |
-| 2 | **No points can be minted by a client** | 2/10 | **10/10** | The measured exploit (`update tasks set points_awarded = 999999` as `authenticated` → 999,999 points paid) is now refused by a trigger. Case: "a promoter cannot set their own task points" — PASS. |
-| 3 | **Database privileges** (RLS, GRANT/REVOKE, `search_path`) | 5/10 | **9/10** | 13 money functions no longer carry the PUBLIC EXECUTE grant; every money function has a pinned `search_path`; `payout_accounts` is unreadable by the browser. **-1:** RLS *over HTTP with real JWTs* is still UNVERIFIED locally (PGlite's superuser bypasses it) — venue `db/live.proof.mjs` against Supabase staging. |
-| 4 | **The API contract matches the frontend** | 4/10 | **10/10** | Six client calls that hit 404s (`/api/plans`, payout-account ×2, business/campaigns, payment-link, payments) now exist; the self-serve business flow now reaches its own verification gate. `npm run site` 187/187. |
-| 5 | **Tests actually gate the build** | 6/10 | **10/10** | `npm test` runs 11 suites (379 checks) including the two migration suites that were written but never wired, plus a new crypto suite. CI runs `npm test`. |
-| 6 | **Git is the source of truth** | 1/10 | **10/10** | 9 files were untracked and 12 modified — including the whole reward manager — while `package.json` already referenced a test file that existed only on disk: a GitHub-sourced build failed outright. All of it is now committed and pushed. |
-| 7 | **Deploy parity** (what runs = what is in git) | 4/10 | **10/10** | `scripts/checkImage.mjs` proves the image ships every path `server.mjs` imports. The live domain is now the one in CI, in `STATUS.md` and in `DEPLOYED_STATE.md` — they named a dead domain before. |
-| 8 | **Migrations are forward-only and provable** | 6/10 | **10/10** | `/readyz` reports repo-vs-database parity. `0014`–`0017` are new files; the applied migrations (`0008`, `0012`, `0013`) were fixed forward in `0017`, never edited. |
-| 9 | **The docs are true** | 3/10 | **10/10** | `README`, `docs/USER-GUIDE.md`, `docs/ADMIN-GUIDE.md`, `STATUS.md`, `DEPLOYED_STATE.md` and the workflow URL now match the code. `STATUS.md` claimed seven migrations and a domain that stopped serving. |
-| 10 | **Observability and operations** | 4/10 | **7/10** | `/healthz` reports every dependency honestly, `/readyz` gates the deploy, and the worker now records *why* something did not deliver. **-3:** there is still no metrics exporter, no tracing and no alerting; failures are visible in logs and in `outbox.last_error`, nowhere else. |
+| TC-F1 | CRITICAL | **Live Supabase migration parity is broken: the live production database does not have `0018_task_policy_gate`, so the DB-level policy defense is absent in production** while API/UI layers enforce it. `predeploy-check` is NO-GO and future deploys (which expect parity) can misbehave. | `node scripts/predeploy-check.js` → FAIL migration parity "repo ships 18 migration(s) but the database max is 17" (run 2026-10-31); README claims "refused in Postgres, in the API and in both consoles" (`README.md:55-60`) | TESTED |
+| TC-F2 | HIGH | **No refund/cancel product path exists for a funded campaign.** `refunded` exists as a legal state (`0008_points_levels.sql:40`, `0016_money_flows.sql:56`) and `business.js:90` can *display* it, but no SQL function sets it, no API route/handler offers it, and neither `admin.html` nor `business.html` has a refund/cancel affordance. A campaigner who funds the wrong amount has money stuck in escrow with only out-of-product (manual SQL) correction. | repo-wide grep `refund` → only state domains + display; zero handlers/routes | TESTED |
+| TC-F3 | HIGH | **`db/live.proof.mjs` section 2 is stale:** it still expects the pre-0007 behavior (`ok:false` + "already on the list") for duplicate sign-ups, while the shipped 0007 contract is an identical SUCCESS shape. The live DB behaves CORRECTLY per 0007 — cross-check proves byte-identical duplicate shape, same code/position/referred, exactly one row, cleaned 204 — but the repo's own live proof gate false-fails on correct behavior and could mask a REAL breach in noise. | `live.proof.mjs:103-106` (blame: unchanged since 66cb2f1 2026-10-02) vs duplicate cross-check 7 PASS / 0 FAIL on live Supabase today; local leads suite "SAME success shape for a known number" PASS | TESTED |
+| TC-F4 | MEDIUM | README overstates the live posture: "refused in Postgres, in the API and in both consoles" is true for the REPO DB, not for the LIVE DB until TC-F1 closes. Exact claim: `README.md:55-60`. | TC-F1 evidence | TESTED |
+| TC-F5 | MEDIUM | `AGENTS.md` states "forward-only 0001..0016" — the repo ships 18 migration files (we count `db/migrations/*.sql` = 18, max `0018_task_policy_gate.sql`). Contract doc is stale. | `AGENTS.md` layout section vs directory census | TESTED |
+| TC-F6 | MEDIUM | `DEPLOYED_STATE.md` presents Railway `https://web-production-045b1.up.railway.app` as live fallback ("parallel/fallback production target") — today it answers EDGE 404 `{"status":"error","code":404,"message":"Application not found","request_id":...}` on `/healthz` and `/`. No app is routed there; the fallback is dead. | curl probes 2026-10-31 | TESTED |
+| TC-F7 | LOW | `DEPLOYED_STATE.md` feature matrix still lists Admin/Promoter/Business dashboards as "0% BUILT / ❌" — all three consoles are built, wired and route-covered today. Matrix is stale (legacy truth from 2026-10-07 era). | route coverage in `npm test` API suite (90/0) + consoles present in `apps/web` | TESTED |
+| TC-F8 | LOW | Provider plan refresh is never-throwing by design; a failed background refresh silently keeps serving the cached catalogue (stale-tolerant, never wiped). Acceptable — noted for observability. | `dataManager.mjs:181-203` | OBSERVED |
+| TC-F9 | LOW | `server.mjs` rate limiting applies to `/config.js` and `/healthz` (30 req/min/IP per prior status); no per-endpoint budget on OTP request — Termii cost exposure on OTP spam is bounded only by Termii account limits. | `server.mjs` (rate-limit block) vs `routes.mjs` requestOtp (no extra limiter) | INFERRED |
+| TC-F10 | MEDIUM | **The deploy gate can fail open:** when the live DB is temporarily unreachable, `predeploy-check.js` catches the fetch error, skips parity with a WARN, and still prints the top-level banner `PREDEPLOY CHECK: GO` — a transient network error converts a hard gate (TC-F1) into a PASS banner, so a deploy could run with unknown migration parity. Observed live during this audit's continuous run (attempt 1 of 3). | `scripts/predeploy-check.js:92-95` (catch → warn → continue; the fail counter stays 0) vs lines 112-113 (fail path); observed output "migration parity skipped → PREDEPLOY CHECK: GO" 2026-10-31 | TESTED |
 
-**Overall: 9.1/10.** The two deductions are stated, not hidden: **RLS over
-HTTP with real JWTs** (dimension 3) and **observability** (dimension 10). Both
-have a named proof venue or a named piece of work; neither is claimed as done.
+## Fixes applied this session
 
----
+None to code — this was a zero-mutation audit (corridor rule §5: fixes require owner
+approval). The ONLY tree change this session was audit files themselves (this file).
+Two temporary self-cleaning probes were run against live systems and left no residue.
 
-## 2. Findings closed this session
-
-| ID | Sev | Finding | Resolution | Label |
-|---|---|---|---|---|
-| C-01 | CRITICAL | The reward manager (`providers/dataManager.mjs`), its test, migrations `0014`–`0016` and three web files were **never committed**. `package.json` referenced `providers/dataManager.test.mjs`, so a GitHub-sourced build failed; GitHub HEAD still shipped the old refusing adapter. | Committed and pushed. | TESTED |
-| C-02 | CRITICAL | The legacy data adapter reported **"delivered" for any 2xx**, falling back to our *own* reference as the provider reference — so an unconfirmed order looked confirmed to the database (`redemptions_fulfilled_has_ref`). | A 2xx without an explicit delivery signal is now **pending**; a delivery with no provider reference is refused. `providers/dataManager.test.mjs`: "legacy 2xx without a delivery signal is NOT delivered". | TESTED |
-| C-03 | CRITICAL | `api/worker.mjs` ignored `retryable`: a retryable refusal marked the redemption **failed** and returned `delivered: true`, consuming the outbox row and losing the points with no reversal. | Three-state outcome (`delivered` / `not delivered + retryable` / `not delivered + permanent`). The outbox row is never marked `delivered` for work that did not happen. | TESTED |
-| C-04 | CRITICAL | A cash payout **never happened**: `worker/cash.mjs` was deleted, `flw.createTransfer` had no caller, and the worker parked the redemption while returning `delivered: true` with the note "cash queued for payout" — a queue that did not exist. | The payout is performed for real against a **verified** payout account, at an owner-set naira rate, with a reference derived from the redemption id. Until the provider confirms, the redemption stays `processing` and the note says exactly that. | TESTED |
-| C-05 | CRITICAL | The assigned promoter could set their own task's `points_awarded` (measured: 999,999 points paid, convertible straight into data bundles). `grant update on tasks to authenticated` + the `tasks_submit` policy guarded *which rows*, never *which columns*. | `guard_task_points()` trigger (migration `0017`). Case: "a promoter cannot set their own task points" — PASS. | TESTED |
-| C-06 | CRITICAL | The views bonus **never paid**: no producer ever wrote `task_proofs.views_source`, so `award_views_bonus()` always returned 0 while the suite was green. | The API stamps `scraped` / `client_claimed`, the reviewer path stamps `reviewer`. | TESTED |
-| C-07 | CRITICAL | The client-supplied view count **beat** the scraped one (`views: views ?? parsedViews`), so the 750-point farming bracket was payable by typing a number. | The scraped value wins; a typed number is labelled `client_claimed` and pays nothing. | TESTED |
-| C-08 | CRITICAL | `0016` claimed the account number is encrypted with **AES-256-GCM — there was no cipher anywhere in the repo**, and the UI promised "encrypted on our side". | `providers/payoutCrypto.mjs`: real AES-256-GCM, versioned envelope, auth tag, HKDF key derivation, **fails closed** with no key. 21 tests. | TESTED |
-| C-09 | HIGH | `revoke execute on function … from anon, authenticated` leaves the grant PostgreSQL gives **every** new function to `PUBLIC`. 13 money functions were still publicly executable. | Revoked `from public, anon, authenticated` and granted `service_role` — for the three not-yet-applied migrations in place, for the applied ones forward in `0017`. | TESTED |
-| C-10 | HIGH | The `0015` backfill labelled historical rows `scraped`, re-granting the exploit the migration claimed to close (the old code stored the *typed* number with `parsed = true`). | Nothing is upgraded to a verified source; historical rows are `client_claimed`. | TESTED |
-| C-11 | HIGH | Six client calls hit endpoints that did not exist (runtime 404): `/api/plans`, `/api/v1/kyc/payout-account` ×2, `/api/v1/business/campaigns`, `/api/v1/campaigns/:id/payment-link`, `/api/v1/campaigns/:id/payments`. | All six exist, with the contract the client expects. | TESTED |
-| C-12 | HIGH | The self-serve business flow was **unreachable**: `business.js` never called `POST /api/v1/campaign-owners`, which `POST /api/v1/campaigns` requires. | The console now submits the verification request and shows the server's real state. | TESTED |
-| C-13 | HIGH | `data.recheck()` had **zero callers**: every parked redemption sat in `processing` forever with the points debited. | `reconcilePending()` resolves parked data redemptions (and cash ones waiting for an account) on the worker tick, with a durable backoff. | TESTED |
-| C-14 | HIGH | A promoter could read their own `payout_accounts` row straight from PostgREST. | `authenticated` no longer holds SELECT on that table; the API serves only the bank name, last four digits and verification state. | TESTED |
-| C-15 | MEDIUM | `DATA_PROVIDER_ORDER` with a typo threw a `TypeError` → `/healthz` 500 and every redemption dead. | Unknown names are reported, never fatal. | TESTED |
-| C-16 | MEDIUM | The Flutterwave webhook matched the redemption by `idempotency_key = <unvalidated ref>` — an unconstrained ref could widen the PostgREST filter. | The reference is constrained to the two shapes we issue (`red-<uuid>`/`cpay-<uuid>`) before it reaches a filter. | TESTED |
-| C-17 | MEDIUM | A "completed" transfer was trusted from the webhook body. | The amount and status are re-fetched from Flutterwave by id; the body is never the authority. | TESTED |
-| C-18 | MEDIUM | `worker/lead.captured.mjs` imported a module that does not exist **and** stamped `verified_at` on a *capture* — a false phone verification. | Rewritten against the real client; it records the capture and states that verification happens in the OTP flow. | TESTED |
-| C-19 | MEDIUM | `views.min_points` was seeded but never applied; a single verified view already paid. | Applied before the brackets, without consuming the bonus. | TESTED |
-| C-20 | LOW | The rate limiter trusted the client's `x-forwarded-for`, so rotating the header rotated the bucket. | The chain is walked from the right by `TRUST_PROXY_HOPS`. | TESTED |
-| C-21 | LOW | `worker/cash.mjs` deleted while `flutterwave.createTransfer`/`resolveAccount`/`banks` had no callers. | The cash path is wired; `resolveAccount` now verifies the account name before a payout account is marked verified. | TESTED |
-| C-22 | LOW | Two orphan pages (`business.html`, `approval-queue.html`) with zero inbound links; a stale live domain in CI, `STATUS.md` and `DEPLOYED_STATE.md`; stray `tmp_*.txt` artifacts committed at the root. | All linked, all corrected, all ignored. | TESTED |
-
----
-
-## 3. Fresh evidence
+## Fresh evidence
 
 | Command | Result |
 |---|---|
-| `npm test` | **379 pass / 0 fail / 5 UNVERIFIED** — phone 17, lead 24, API 90, image 7, ledger 56, leads 41, points 59, redemption-integrity 13, views-evidence 17, dataManager 34, payoutCrypto 21 |
-| `npm run site` | **187 pass / 0 fail** — SITE CHECK: PASS |
-| `node scripts/checkImage.mjs` | 7/7 — IMAGE CONTENTS: ALL HOLD |
-| `node scripts/predeploy-check.js` | migration parity repo 17 vs database 13 → **NO-GO until the migrations are applied** (the gate doing its job) |
-| live `GET /healthz` | 200 · `ok:true` · `data.ready:true` · `provider:twenty5` · `vtung ready:true` |
-| live `GET /readyz` | 200 · `migrations {repo:13, applied:13}` → parity holds at the moment of writing |
-| Flutterwave payment-links probe | `POST /v3/payment-links`, `/v3/links`, `/v3/payments/links` all answer **HTTP 200 with an HTML "Cannot POST" page**; the API host serves no payment-link endpoint, so none is fabricated. The link returned is a real page on this site. |
+| `npm test` | EXIT 0 — phone 17/0, lead 24/0, API 90/0, image 7/0, ledger 56/0 (2 UNVERIFIED: live-JWT venue), leads 41/0 (1 UNVERIFIED), points 59/0 (2 UNVERIFIED), policy 39/0, redemption-integrity 13/0, views-evidence 17/0, dataManager 34/0, payoutCrypto 21/0 → **418 PASS / 0 FAIL / 5 UNVERIFIED** |
+| `node db/live.proof.mjs` | 13 PASS / 1 FAIL — the FAIL is TC-F3 (stale expectation; live behavior proven correct by cross-check below). RLS boundary, migration-ledger secrecy, session flows, event queueing all PASS. Cleanup 204/204/200. |
+| oracle cross-check (temp script, deleted) | **7 PASS / 0 FAIL** — duplicate submit_lead returns the SAME referral_code, SAME position, byte-identical canonified shape, exactly ONE lead row on live Supabase → designed 0007 contract holds live |
+| `node scripts/predeploy-check.js` (first pass ~21:1x) | EXIT 1 — env 5/5 PASS, CSP snapshot PASS, **migration parity FAIL (repo 18 vs live 17) → NO-GO** |
+| `node scripts/predeploy-check.js` (continuous run, 3 attempts) | attempt 1: transient `fetch failed` → parity SKIPPED → banner printed **GO** (silent-failure pattern, logged as TC-F10); attempts 2+3 reached the DB cleanly: parity **FAIL repo 18 vs live 17 → NO-GO twice consecutively** — TC-F1 re-verified live |
+| `node db/live.proof.mjs` (full second run) | **13 PASS / 1 FAIL** — the 1 FAIL is the known-stale TC-F3 duplicate expectation (live returns the designed 0007 identical-success shape); RLS boundary, session flows, outbox queueing, admin visibility, PII hygiene all PASS live; cleanup 204/204/200 (no residue) |
+| `Select-String refund api/*.mjs` | **0 matches** — TC-F2 fresh seal: no refund handler exists in the API layer |
+| source reads (Team-A absorb) | `api/checkin.mjs` — SQL-side idempotent daily award, active-profile gate, errors surfaced; `api/mining.mjs` — read-only process analytics (does NOT mint points), admin/support/finance see platform scope, promoter own scope; `api/social.mjs` — `connect` saves handles honestly unverified except Telegram t.me probe, env names only (no secret leak), and nothing in SQL/API pays on social_links (0012 defines table + own-select policy only) → social connect is not a points/abuse vector |
+| `node scripts/verifyLive.mjs https://promota.click` | **19 PASS / 0 FAIL — DEPLOY VERIFY: ALL HOLD** (real sign-up + cleanup) |
+| `npm run site` | EXIT 0 — 187 PASS / 0 FAIL (11 pages: about, admin, approval-queue, blog, business, contact, dashboard, index, privacy, refund, terms) |
+| curl probes | `promota.click/healthz` 200 `{ok:true, config:true, auth:true, providers:{supabase,termii,flutterwave,sessions all true, data ready twenty5+vtung}}`; root 200 with strict CSP (`script-src 'self'`, `connect-src 'self' https://*.supabase.co`, `frame-ancestors 'none'`), `x-frame-options: DENY`, `referrer-policy: no-referrer`; Railway fallback 404 EDGE ("Application not found") |
+| route-table cross-comparison | every console fetch path (auth, dashboard claim/submit/policy/redeem/checkin/earnings/referrals/plans/me, business owner/campaigns/payment-link/payments, kyc payout-account, admin stats/users/tasks/campaigns/settings/owners/kyc/plugins/audit/mining) resolves to the exact or dynamic route table — no mismatch found |
 
-**The 5 UNVERIFIED items are not passes.** Each names its proof venue:
-anon INSERT-only policy over HTTP · anon cannot read another promoter's points
-over HTTP · client cannot insert `point_entries` directly · `assign_role`
-success path with a real grant · settings write-gating. All five are
-**PostgREST-over-HTTPS with real JWTs** — PGlite's superuser bypasses RLS by
-design. Venue: `db/live.proof.mjs` against Supabase staging.
+## Release posture
 
----
+- **Lead capture + landing (promota.click):** GO today — deploy-verified 19/0, oracle
+  cross-check 7/0, headers/CSP strict, config matches the live project.
+- **Promoter dashboard:** GO once TC-F1 is closed (all claim/redeem/points machinery is
+  applied live through 0017; the missing piece is only the 0018 DB gate for task-policy
+  defense in depth).
+- **Business/campaigner dashboard:** GO for create→fund→launch→track; CAUTION because
+  TC-F2 (no refund/cancel affordance) means a misfunded campaign cannot be fixed in
+  product. Owner may accept with a manual-SQL runbook.
+- **Admin console:** GO — every route wired, coverage tested in the API suite.
+- **Money paths (escrow/refund/payout):** GO on the applied 0016/0017 surface;
+  refund remains a product gap (TC-F2).
+- **Points/redemption:** GO — idempotency, append-only ledger, reversal path all TESTED.
+- **Gamification vs platform policies:** GO in code (API 422 + allowlist + consoles),
+  **NO-GO at the DB layer until 0018 is applied live (TC-F1)** — the "refused in
+  Postgres" marketing claim is not yet true in production.
+- **OVERALL GO-LIVE (tomorrow):** PERSISTENT NO-GO until TC-F1 (+ owner-accepted TC-F2).
+  Owner-gated steps, by name: (1) run `npm run db:remote` to apply 0018 to the live
+  Supabase project; (2) redeploy promota.click and re-run
+  `node scripts/predeploy-check.js` + `node scripts/verifyLive.mjs https://promota.click`;
+  (3) decide refund posture (ship without affordance + manual runbook, or build refund);
+  (4) one small code fix is queued for owner approval: TC-F10 — make
+  `scripts/predeploy-check.js` FAIL CLOSED when the DB is unreachable (parity skip must
+  abort the gate, never print GO), so a transient network error cannot pass the deploy
+  gate.
 
-## 4. Release posture
+## Not done (limitations recorded, not hidden)
 
-| Surface | Verdict | Why |
-|---|---|---|
-| Promoter sign-in, dashboard, tasks, check-in, referrals | **GO** | 379 checks green; live `/healthz` and `/readyz` green. |
-| Data-bundle rewards (twenty5 → vtung failover matrix) | **GO** | Matrix proven by 34 tests; live `data.ready=true`. VTU delivery is still gated on the owner's reseller upgrade — the failover path is what covers it until then. |
-| Cash payouts | **CONDITIONAL GO** | The path is implemented and honest, but a payout needs a **verified** account (bank resolve) and `redemption.cash_rate_bp`. Both are owner actions, not code gaps. |
-| Business campaign funding | **CONDITIONAL GO** | A payment intent is created and shown; the escrow is credited only from a verified provider callback. No provider-hosted payment link exists on this API host, so the business funds by transfer against the reference. |
-| Multi-tenant / partner portal | **NO-GO** | Not built. Stated, not implied. |
-| Public launch switch | **NO-GO** | `settings.platform.launched` is `false` and no switch was flipped. |
-
----
-
-## 5. Not done (limitations recorded, not hidden)
-
-- **RLS over HTTP with real JWTs is still unproven.** The grants are proven;
-  the policies are proven against PGlite's GRANTs and the trigger layer, not
-  against PostgREST with a signed JWT. `db/live.proof.mjs` is the venue.
-- **Observability is logs and `outbox.last_error` only.** No metrics, no
-  tracing, no alerting. A failure that only logs is a failure nobody is paged
-  for. This is dimension 10's deduction.
-- **The owner still owes three things** that are not code: the vtu.ng
-  reseller upgrade, the live test transaction approval, and the production
-  key swap (the current twenty5 key is `pk_test_`/`sk_test_` — **test mode**).
-- **Flutterwave has no hosted payment-link endpoint on this API host**, so
-  money-in is a transfer against a reference rather than a hosted checkout.
-  Nothing was fabricated to hide that.
-- **The two `docs/` gaps that remain** are recorded in `docs/ADMIN-GUIDE.md`:
-  the partner portal is not built, and the campaign owner portal is a single
-  console rather than a multi-tenant product.
+- Both purpose-built review subagents (promota-team-a, promota-team-c) could NOT run in
+  either pass tonight: the same provider quota walls persisted (Gemini free-tier daily
+  generate-content cap ~22h cooldown; Cloudflare Workers daily 10,000-neuron allocation
+  exhausted). Both missions were absorbed into this main-session review again — findings
+  and evidence rules unchanged; recorded here and in the evolution log.
+- `db/live.proof.mjs` was not edited (TC-F3): the fix is a test-file change; it awaits
+  owner approval together with TC-F1's `db:remote` step because both touch the live
+  verification pipeline.
+- No load/soak testing was performed (no staging traffic rig exists in-repo).
+- Termii SMS OTP worker delivery: probes prove Termii credentials are configured
+  (`healthz termii:true`); an outbound OTP send was NOT exercised (sends SMS to a real
+  handset — needs owner consent and a test handset).
+- Flutterwave payment link: credentials configured (`healthz flutterwave:true`); no real
+  NGN transfer/charge was executed (would move real money — owner-gated).
+- KYC verification flow: tier gates proven in SQL/PGlite; end-to-end with real NIN/BVN
+  documents not exercised (requires real identity documents).
+- OAuth/YouTube follower verification: not built (README lists it as future scope) —
+  view-evidence instead relies on parsed factual counts paying brackets only for
+  reviewer-confirmed or scraped counts (views-evidence suite 17/0).
