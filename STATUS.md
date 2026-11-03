@@ -113,10 +113,36 @@ the API (`api/business.mjs`, `api/routes.mjs`) and both consoles.
 | Policy gate holds locally | `node db/policy.test.mjs` � 35 PASS / 0 FAIL |
 | Existing suites still hold | `npm test` chain � ledger 56/0, leads 41/0, points 59/0, redemption 13/0, views 17/0, api 90/0, providers 34/0 + 21/0, phone 17/0, lead 24/0, image 7/0 |
 | Site integrity | `node scripts/checkSite.mjs` � 187 PASS / 0 FAIL (the 3 `?next=` false positives are fixed) |
-| Live Supabase | **NOT APPLIED** � repo ships 18 migrations, live ledger max is 17. `predeploy-check` is NO-GO until `npm run db:remote` runs with owner approval. |
+| Live Supabase | **NOT APPLIED** — repo ships 20 migrations (`0001`–`0020`), live ledger max was 17 at the last probe. `predeploy-check` is NO-GO until `npm run db:remote` runs with owner approval. |
 | Hostinger | **NOT REDEPLOYED** � pending the migration above. |
 
 **Verdict:** the policy risk is closed in code. The live database and the Hostinger
 deployment are the two owner-gated steps left. Report:
 `audit/PROMOTA-PLATFORM-POLICY-REVIEW.md`; operating model:
 `docs/CREATOR-DELIVERY-PROTOCOL.md`.
+
+## Mutual promotion engine — "Promote You" (2026-11-03)
+
+Members can now promote each other: a member publishes a promo card, two members
+agree a pair, each delivers one disclosed post on the other's behalf, a reviewer
+approves each side, and both are paid in points. Business rules, caps, the
+deadline and point minting live in Postgres; the API never computes a point
+value.
+
+| Claim | Evidence |
+|---|---|
+| Migrations apply on real PostgreSQL | `node scripts/migrateUp.mjs` — 21 migration(s) applied, including `0019_promotion_point_kinds.sql` and `0020_mutual_promotion.sql` |
+| Rule matrix holds | `node db/mutual-promotion.test.mjs` — 56 PASS / 0 FAIL / 2 UNVERIFIED |
+| Routes are registered and session-gated | `node api/api.test.mjs` — 110 PASS / 0 FAIL, including every promotion route |
+| Full gate | `npm test` — EXIT 0 (ledger 56/0, leads 41/0, points 59/0, policy 39/0, redemption 13/0, views 17/0, mutual promotion 56/0, api 110/0, image 7/0, providers 34/0 + 21/0) |
+| Site integrity | `npm run site` — 187 PASS / 0 FAIL |
+| Product and rules | `docs/PROMOTION-MUTUAL.md` |
+| Live Supabase | **NOT APPLIED** — `0019`/`0020` are not on the live database; `npm run db:remote` needs the live Postgres password (owner action) |
+| Deployment | **NOT DEPLOYED** — no live success is claimed for this feature |
+
+The two UNVERIFIED cases are RLS proofs that need real JWTs (anonymous read of
+another member's pair, and browser write denial); their venue is
+`npm run db:live` against the staged project.
+
+**Verdict:** the feature is complete in `main` and proven locally. Live remains
+owner-blocked on the database password.

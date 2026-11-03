@@ -23,6 +23,14 @@ A surgical enhancement of the existing Promota backend — **not a rebuild** —
 
 Everything is additive: new numbered migrations, new routes, new worker topics, new pages. Existing tables, functions and tests are not rewritten.
 
+> **Migration numbering update (2026-11-03).** The **Promote You mutual-promotion
+> engine** landed first and took `0019`–`0020`
+> (`0019_promotion_point_kinds.sql`, `0020_mutual_promotion.sql`; see
+> `docs/PROMOTION-MUTUAL.md`). Every phase below therefore shifts by two:
+> raffle `0021`, referral milestones `0022`, chat links `0023`, challenges
+> `0024`, task taxonomy `0025`, data ladder `0026`. The file names in each
+> heading already reflect the shift.
+
 ---
 
 ## 2. Non-negotiable rules (from `AGENTS.md`)
@@ -79,7 +87,7 @@ New outbox topics: `raffle.draw_due`, `raffle.drawn`, `prize.claimable`, `referr
 **Why first:** no new migration is real until the live database is at parity.
 
 Tasks:
-1. Owner supplies or resets the live Postgres password; run `npm run db:remote` → applies `0018` (and then 0019+ as they land).
+1. Owner supplies or resets the live Postgres password; run `npm run db:remote` → applies `0018`–`0020` (and then `0021+` as they land).
 2. `node scripts/predeploy-check.js` → **GO** (18/18).
 3. Redeploy Hostinger from `main` via `scripts/deploy-hostinger.mjs`; `node scripts/verifyLive.mjs https://promota.click` → 19/0.
 4. `npm test` + `npm run site` green at baseline.
@@ -89,7 +97,7 @@ Blocker: live DB credential (owner).
 
 ---
 
-## 6. Phase 1 — Raffle engine (`0019_raffle_draws.sql`) — 3 days
+## 6. Phase 1 — Raffle engine (`0021_raffle_draws.sql`) — 3 days
 
 ### 6.1 Schema
 - `draws` — `competition_id`, `status` (`open → committed → drawn → revealed`), `server_seed_hash`, `server_seed` (sealed until reveal), `client_seed`, `entrant_count`, `entrant_hash`, `committed_by`, `committed_at`, `drawn_at`, `revealed_at`, `result_hash`.
@@ -122,7 +130,7 @@ Blocker: live DB credential (owner).
 
 ---
 
-## 7. Phase 2 — Referral milestone, downline data, share mechanics (`0020_referral_milestones.sql`) — 2 days
+## 7. Phase 2 — Referral milestone, downline data, share mechanics (`0022_referral_milestones.sql`) — 2 days
 
 ### 7.1 Schema and functions
 - `referral_milestones` — `threshold` (100), `reward_kind` (`cash`), `reward_minor` (5 000 000 kobo), `active_window_days` (90), `kyc_tier_required` (2), `is_active`.
@@ -148,7 +156,7 @@ Blocker: live DB credential (owner).
 
 ---
 
-## 8. Phase 3 — Telegram + WhatsApp (`0021_chat_links.sql`) — 4 days
+## 8. Phase 3 — Telegram + WhatsApp (`0023_chat_links.sql`) — 4 days
 
 ### 8.1 Schema
 - `chat_links` — `profile_id`, `platform` (`telegram|whatsapp`), `chat_id`, `phone_e164`, `verified_at`, `state`; unique `(platform, chat_id)`.
@@ -179,7 +187,7 @@ Blocker: live DB credential (owner).
 
 ---
 
-## 9. Phase 4 — Creator Challenges (`0022_challenges.sql`) — 5 days
+## 9. Phase 4 — Creator Challenges (`0024_challenges.sql`) — 5 days
 
 ### 9.1 Schema
 - `challenges` — `slug`, `title`, `category` (`comedy|singing|sports|ai|journalism|ad_visuals`), `brief`, `rules`, `start_at`, `end_at`, `status` (`draft|open|judging|published|closed`), `prize_pool` jsonb, `creator_share_bp` (6000), `platform_share_bp` (4000), `rights_version`.
@@ -211,7 +219,7 @@ Blocker: live DB credential (owner).
 
 ---
 
-## 10. Phase 5 — Compliant task taxonomy (`0023_task_taxonomy.sql`) — 2 days
+## 10. Phase 5 — Compliant task taxonomy (`0025_task_taxonomy.sql`) — 2 days
 
 ### 10.1 What changes
 - Bump `current_task_policy_version()` to `2026-11-03`.
@@ -232,7 +240,7 @@ Blocker: live DB credential (owner).
 
 ---
 
-## 11. Phase 6 — Data ladder and share economy (`0024_data_ladder.sql`) — 1.5 days
+## 11. Phase 6 — Data ladder and share economy (`0026_data_ladder.sql`) — 1.5 days
 
 - `data_ladder`: 500 MB, 1 GB, 5 GB (5-hour where the provider offers it), 10 GB, 20 GB, cash; points cost, provider plan code per network, active flag.
 - `share.min_points` floor at 0 views; `share.views_brackets`; `share.reshare_bonus_points`.
@@ -268,7 +276,7 @@ Blocker: live DB credential (owner).
 1. `npm test` — all suites including new (`raffle`, `referrals`, `bot`, `challenges`, `data ladder`).
 2. `npm run site` — 187+ checks, 0 failures.
 3. `node scripts/predeploy-check.js` — GO (repo = live).
-4. `npm run db:remote` — apply `0019`–`0024` in order.
+4. `npm run db:remote` — apply `0021`–`0026` in order.
 5. Hostinger redeploy from `main`; `verifyLive` 19/0.
 6. Live smoke: raffle draw in staging, bot link + task proof, challenge submit + revenue split, downline reward.
 7. Update `STATUS.md`, `DEPLOYED_STATE.md`, `README.md`, `docs/REWARDS.md`, `docs/LOTTERY.md` (flip to SHIPPED with the verification trail), audit, session compact, memory note.
@@ -281,7 +289,7 @@ Blocker: live DB credential (owner).
 
 | Area | Files |
 |---|---|
-| Migrations | `db/migrations/0019_raffle_draws.sql` … `0024_data_ladder.sql` |
+| Migrations | `db/migrations/0021_raffle_draws.sql` … `0026_data_ladder.sql` |
 | API | `api/routes.mjs` (new routes), `api/raffle.mjs`, `api/challenges.mjs`, `api/bots/telegram.mjs`, `api/bots/whatsapp.mjs`, `api/promoter.mjs` (milestones/downline), `api/business.mjs` (taxonomy) |
 | Worker | `api/worker.mjs` (new topics: draw, prize, milestone, downline data, challenge revenue) |
 | Providers | `providers/dataManager.mjs` (ladder mapping), `providers/flutterwave.mjs` (creator/milestone payouts) |
@@ -306,7 +314,7 @@ Blocker: live DB credential (owner).
 3. Confirm the **challenge prize pool** and the monetization source (AdSense only, sponsors, or both).
 4. Confirm **data ladder** points/prices and whether the 5-hour bundle is available from the aggregator.
 5. Confirm that paid **like/follow/subscribe/watch/comment** are **not** reinstated; approve the compliant replacements.
-6. Provide or reset the **live Postgres password** so `0018`–`0024` can be applied.
+6. Provide or reset the **live Postgres password** so `0018`–`0026` can be applied.
 7. Decide when `noindex` comes off for SEO.
 
 ---

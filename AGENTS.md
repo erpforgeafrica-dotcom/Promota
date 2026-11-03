@@ -70,15 +70,18 @@ npm test
 That is the gate. It runs, in order: `apps/web/phone.test.mjs`,
 `apps/web/lead.test.mjs`, `api/api.test.mjs`, `scripts/checkImage.mjs`,
 `db/ledger.test.mjs`, `db/leads.test.mjs`, `db/points.test.mjs`,
-`providers/dataManager.test.mjs` — the last three on real PostgreSQL via
-PGlite. Exit code 0 means the whole chain passed.
+`db/policy.test.mjs`, `db/redemption-integrity.test.mjs`,
+`db/views-evidence.test.mjs`, `db/mutual-promotion.test.mjs`,
+`providers/dataManager.test.mjs`, `providers/payoutCrypto.test.mjs` - the
+`db/*` suites run on real PostgreSQL via PGlite. Exit code 0 means the whole
+chain passed.
 
 Other commands that matter:
 
 | Command | What it proves |
 |---|---|
 | `npm run site` | Page integrity: anchors, assets, SEO basics, theme switch, a11y tokens |
-| `npm run db:test` | The three PGlite suites only (ledger, leads, points) |
+| `npm run db:test` | The PGlite suites only (ledger, leads, points, policy, redemption-integrity, views-evidence, mutual-promotion) |
 | `npm run db:up` | Applies `db/migrations` to a local PGlite database |
 | `npm run db:remote` | Applies migrations to the live Supabase project |
 | `npm run db:probe` | Live Supabase reachability |
@@ -103,9 +106,9 @@ api/               routes.mjs (route table), supabase.mjs (PostgREST client),
 providers/         termii.mjs (SMS/OTP), flutterwave.mjs (bank transfers),
                    data.mjs + dataManager.mjs (data-bundle failover matrix),
                    twenty5.mjs, vtung.mjs, payoutCrypto.mjs
-db/migrations/     forward-only 0001..0016 — the place business rules live
-db/*.test.mjs      PGlite suites (ledger, leads, points, redemption-integrity,
-                   views-evidence)
+db/migrations/     forward-only 0001..0020 — the place business rules live
+db/*.test.mjs      PGlite suites (ledger, leads, points, policy, redemption-integrity,
+                   views-evidence, mutual-promotion)
 scripts/           migrateUp.mjs, migrateRemote.mjs, migrations.mjs, checkImage.mjs,
                    checkSite.mjs, serve.mjs, verifyLive.mjs, predeploy-check.js
 audit/             the house review format: SPRINT22-CURRENT-REVIEW.md is canonical

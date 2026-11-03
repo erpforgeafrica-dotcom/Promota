@@ -33,12 +33,12 @@ apps/web/          vanilla JS frontend: landing + OTP sign-in, promoter
 api/               production API: OTP sessions, tasks, redeem, referrals, worker
 providers/         Termii (SMS/OTP), Flutterwave (bank transfers), data.mjs +
                    dataManager.mjs (twenty5 -> vtung failover), payoutCrypto.mjs
-db/migrations/     Supabase schema 0001-0018: RBAC, ledger, escrow, tasks,
+db/migrations/     Supabase schema 0001-0020: RBAC, ledger, escrow, tasks,
                    payouts, disputes, points/levels, competitions, RLS,
-                   platform-policy gate for creator delivery
+                   platform-policy gate, mutual promotion ("Promote You")
 scripts/           site checker, preview server, identity exporter, image guard
 apps/web/assets/identity/   SVG masters + verified PNG exports + DESIGN_BRIEF.json
-docs/              BRAND.md, BRAND-SKILLS.md, LEAD-CAPTURE.md, USER-GUIDE.md, ADMIN-GUIDE.md
+docs/              BRAND.md, BRAND-SKILLS.md, LEAD-CAPTURE.md, USER-GUIDE.md, ADMIN-GUIDE.md, PROMOTION-MUTUAL.md
 ```
 
 ## What is actually wired today (do not overstate)

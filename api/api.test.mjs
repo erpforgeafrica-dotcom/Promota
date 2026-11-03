@@ -129,6 +129,14 @@ const routes = await import('../api/routes.mjs');
     'GET /api/v1/promoter/payouts',
     'POST /api/v1/checkin',
     'GET /api/v1/checkin',
+    'GET /api/v1/promotion/cards',
+    'POST /api/v1/promotion/cards',
+    'GET /api/v1/promotion/cards/mine',
+    'GET /api/v1/promotion/pairs',
+    'POST /api/v1/promotion/pairs',
+    'GET /api/v1/admin/promotion/cards',
+    'GET /api/v1/admin/promotion/deliveries',
+    'POST /api/v1/admin/promotion/expire',
   ];
   for (const r of expected) {
     check(`route ${r} is registered`, typeof routes.routes[r] === 'function');
@@ -145,6 +153,10 @@ const routes = await import('../api/routes.mjs');
     'POST /api/admin/kyc/0b0e0000-0000-0000-0000-000000000001/verify',
     'POST /api/v1/campaigns/0b0e0000-0000-0000-0000-000000000001/payment-link',
     'GET /api/v1/campaigns/0b0e0000-0000-0000-0000-000000000001/payments',
+    'POST /api/v1/promotion/pairs/0b0e0000-0000-0000-0000-000000000001/accept',
+    'POST /api/v1/promotion/pairs/0b0e0000-0000-0000-0000-000000000001/deliver',
+    'POST /api/v1/admin/promotion/cards/0b0e0000-0000-0000-0000-000000000001/review',
+    'POST /api/v1/admin/promotion/deliveries/0b0e0000-0000-0000-0000-000000000001/review',
   ]) {
     check(`dynamic route ${p} is registered`, typeof routes.routes[p] === 'function');
   }
@@ -215,6 +227,22 @@ const routes = await import('../api/routes.mjs');
   check('GET /api/v1/business/campaigns refuses without a session', bizCampaigns.status === 401);
   const planList = await routes.routes['GET /api/plans'](fakeReq({}));
   check('GET /api/plans refuses without a session', planList.status === 401);
+
+  // every mutual-promotion surface refuses an unauthenticated caller before it
+  // reads a body or touches a row
+  for (const [key, body] of [
+    ['GET /api/v1/promotion/cards', {}],
+    ['POST /api/v1/promotion/cards', { title: 'My business', summary: 'A real summary', linkUrl: 'https://example.com' }],
+    ['GET /api/v1/promotion/cards/mine', {}],
+    ['GET /api/v1/promotion/pairs', {}],
+    ['POST /api/v1/promotion/pairs', { selfCardId: '0b0e0000-0000-0000-0000-000000000001', partnerCardId: '0b0e0000-0000-0000-0000-000000000002' }],
+    ['GET /api/v1/admin/promotion/cards', {}],
+    ['GET /api/v1/admin/promotion/deliveries', {}],
+    ['POST /api/v1/admin/promotion/expire', {}],
+  ]) {
+    const res = await routes.routes[key](fakeReq(body));
+    check(`${key} refuses without a session`, res.status === 401, JSON.stringify(res));
+  }
 }
 
 /* --------------------------------------------- OTP request -> verify wiring */

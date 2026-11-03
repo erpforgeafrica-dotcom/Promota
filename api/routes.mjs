@@ -21,6 +21,7 @@ import * as business from './business.mjs';
 import * as mining from './mining.mjs';
 import * as checkin from './checkin.mjs';
 import * as payouts from './payouts.mjs';
+import * as promotion from './promotion.mjs';
 
 const ok = (body, status = 200) => ({ status, body });
 const fail = (message, status = 400, extra = {}) => ({ status, body: { error: message, ...extra } });
@@ -859,6 +860,17 @@ const exactRoutes = {
   'GET /api/v1/promoter/payouts': promoter.payouts,
   'POST /api/v1/checkin': checkin.checkin,
   'GET /api/v1/checkin': checkin.checkinStatus,
+  // "Promote You" — members promote each other. Card publishing, pair
+  // proposals and the two moderation queues. The member never supplies an
+  // actor id; the handler passes the verified session id into SQL.
+  'GET /api/v1/promotion/cards': promotion.listCards,
+  'POST /api/v1/promotion/cards': promotion.createCard,
+  'GET /api/v1/promotion/cards/mine': promotion.myCards,
+  'GET /api/v1/promotion/pairs': promotion.myPairs,
+  'POST /api/v1/promotion/pairs': promotion.proposePair,
+  'GET /api/v1/admin/promotion/cards': promotion.adminListCards,
+  'GET /api/v1/admin/promotion/deliveries': promotion.adminListDeliveries,
+  'POST /api/v1/admin/promotion/expire': promotion.adminExpirePairs,
 };
 
 /**
@@ -884,6 +896,10 @@ const DYNAMIC_ROUTES = [
   { method: 'POST', re: /^\/api\/admin\/kyc\/([0-9a-f-]{36})\/verify\/?$/i, params: ['id'], fn: admin.verifyKycTier },
   { method: 'POST', re: /^\/api\/v1\/campaigns\/([0-9a-f-]{36})\/payment-link\/?$/i, params: ['id'], fn: payouts.createPaymentLink },
   { method: 'GET', re: /^\/api\/v1\/campaigns\/([0-9a-f-]{36})\/payments\/?$/i, params: ['id'], fn: payouts.listCampaignPayments },
+  { method: 'POST', re: /^\/api\/v1\/promotion\/pairs\/([0-9a-f-]{36})\/accept\/?$/i, params: ['id'], fn: promotion.acceptPair },
+  { method: 'POST', re: /^\/api\/v1\/promotion\/pairs\/([0-9a-f-]{36})\/deliver\/?$/i, params: ['id'], fn: promotion.submitDelivery },
+  { method: 'POST', re: /^\/api\/v1\/admin\/promotion\/cards\/([0-9a-f-]{36})\/review\/?$/i, params: ['id'], fn: promotion.adminReviewCard },
+  { method: 'POST', re: /^\/api\/v1\/admin\/promotion\/deliveries\/([0-9a-f-]{36})\/review\/?$/i, params: ['id'], fn: promotion.adminReviewDelivery },
 ];
 
 function resolveRoute(key) {
