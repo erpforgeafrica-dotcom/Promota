@@ -5,6 +5,30 @@ time; the symptom it produced is only an example. Newest first.
 
 ---
 
+## 11. An enum value added in the migration that uses it fails on a fresh database
+
+**Symptom.** The promotion engine needed two new `point_kind` values and then
+inserted them in the same file that minted points. PostgreSQL refuses: a newly
+added enum value cannot be used in the same transaction that adds it. The
+migration applied on an incremental database, so the failure would only appear
+on a clean rebuild — exactly what CI and a new machine do.
+
+**Pattern.** *DDL and the rows that depend on it are separate transactions.*
+The same applies to "add a route" and "the route is covered": the router can
+resolve a handler while no test proves it, so a dropped registration would go
+unnoticed until production.
+
+**Signal to recognise.** `migrateUp` passes on an existing database but a fresh
+`.cache/pglite` run throws `unsafe use of new value of enum type`.
+`routes.mjs` exports a handler that is absent from the exact/dynamic tables.
+
+**Rule adopted.** Put enum additions in the migration before the one that uses
+them (here `0019` then `0020`), and make every new route land with a coverage
+line in `api/api.test.mjs` plus a 401 case. Rebuild from scratch before
+claiming a migration is safe.
+
+---
+
 ## 1. A test file referenced by `package.json` but never committed breaks the build, not the test
 
 **Symptom.** `npm test` passed locally for weeks. A Railway build sourced from
