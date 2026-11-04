@@ -28,6 +28,9 @@ apps/web/config.js
 .DS_Store
 Thumbs.db
 
+# agent memory (local state, never shipped)
+.second-memory/
+
 # scratch output from local runs — captured at the repo root by accident
 /tmp_*.txt
 /completion-proof.txt

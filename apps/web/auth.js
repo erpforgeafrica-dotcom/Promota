@@ -69,6 +69,46 @@
 
   function signOut() { clearToken(); }
 
+  /* One-time session handoff: /admin.html#token=<session token>.
+
+     WHY A FRAGMENT: the browser never sends the fragment to the server and
+     never includes it in a Referer header, so the token cannot end up in
+     access logs. It is consumed once, then erased from the address bar and
+     from the history entry.
+
+     WHY A ROLE CHECK: without it, a link could log the owner into somebody
+     else's ordinary account (login CSRF). Only an already-privileged session
+     is accepted here; a promoter token in a fragment is ignored. The signature
+     is still verified server-side on every request - this check only decides
+     whether the browser should adopt the token at all. */
+  var PRIVILEGED_ROLES = { owner: true, admin: true, support: true };
+
+  /** Decode the (unverified) claims of a token, or null when malformed. */
+  function claimsOf(token) {
+    var parts = String(token || '').split('.');
+    if (parts.length !== 3) return null;
+    var b = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    try { return JSON.parse(atob(b)); } catch (e) { return null; }
+  }
+
+  /** Adopt a privileged token from the URL fragment. Returns true when used. */
+  function adoptHashToken() {
+    var hash = String((typeof location !== 'undefined' && location.hash) || '');
+    if (hash.indexOf('#token=') !== 0) return false;
+    var token = '';
+    try { token = decodeURIComponent(hash.slice(7)).trim(); } catch (e) { return false; }
+    var claims = claimsOf(token);
+    if (!claims || !PRIVILEGED_ROLES[claims.role]) return false;
+    if (!claims.exp || claims.exp * 1000 <= Date.now()) return false;
+    setToken(token);
+    try { history.replaceState(null, '', location.pathname + location.search); }
+    catch (e) { /* older browser: the token is already stored */ }
+    return true;
+  }
+
+  adoptHashToken();
+
   window.PromotaAuth = {
     getToken: getToken,
     setToken: setToken,
@@ -77,6 +117,7 @@
     normalisePhone: normalisePhone,
     requestOtp: requestOtp,
     verifyOtp: verifyOtp,
-    signOut: signOut
+    signOut: signOut,
+    adoptHashToken: adoptHashToken
   };
 })();
