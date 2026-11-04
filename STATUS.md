@@ -92,6 +92,11 @@ raw command output + artifact hashes), plus `PROOF/C3-railway-live/` for the dep
    (`PROOF/C3-railway-live/`).
 4. Registered entity name/jurisdiction + PII-storage decision.
 5. Termii API key for the SMS double opt-in worker.
+6. Reset the live Postgres password (Supabase dashboard → Project Settings →
+   Database → Reset database password). The password in
+   `C:\Users\pc\sabisupabase.txt.txt` returns `28P01` on both pooler ports, so
+   `npm run db:remote` cannot apply `0018`–`0020` and the promotion routes stay
+   at HTTP 500 until it does.
 
 ## Identity export verification
 
@@ -114,7 +119,7 @@ the API (`api/business.mjs`, `api/routes.mjs`) and both consoles.
 | Existing suites still hold | `npm test` chain � ledger 56/0, leads 41/0, points 59/0, redemption 13/0, views 17/0, api 90/0, providers 34/0 + 21/0, phone 17/0, lead 24/0, image 7/0 |
 | Site integrity | `node scripts/checkSite.mjs` � 187 PASS / 0 FAIL (the 3 `?next=` false positives are fixed) |
 | Live Supabase | **NOT APPLIED** — repo ships 20 migrations (`0001`–`0020`), live ledger max was 17 at the last probe. `predeploy-check` is NO-GO until `npm run db:remote` runs with owner approval. |
-| Hostinger | **NOT REDEPLOYED** � pending the migration above. |
+| Hostinger | **REDEPLOYED 2026-11-04** — builds on `b8e41a5` completed; `/`, `/healthz` and `/admin.html` return 200 and an owner session verifies against `/api/me` and `/api/admin/stats`. |
 
 **Verdict:** the policy risk is closed in code. The live database and the Hostinger
 deployment are the two owner-gated steps left. Report:
@@ -138,7 +143,7 @@ value.
 | Site integrity | `npm run site` — 187 PASS / 0 FAIL |
 | Product and rules | `docs/PROMOTION-MUTUAL.md` |
 | Live Supabase | **NOT APPLIED** — `0019`/`0020` are not on the live database; `npm run db:remote` needs the live Postgres password (owner action) |
-| Deployment | **NOT DEPLOYED** — no live success is claimed for this feature |
+| Deployment | **DEPLOYED, but the promotion routes 500 until the DB catches up** — `/api/v1/promotion/cards` and `/api/v1/promotion/pairs` return HTTP 500 `internal error` on the live 17-migration database |
 
 The two UNVERIFIED cases are RLS proofs that need real JWTs (anonymous read of
 another member's pair, and browser write denial); their venue is
@@ -146,3 +151,24 @@ another member's pair, and browser write denial); their venue is
 
 **Verdict:** the feature is complete in `main` and proven locally. Live remains
 owner-blocked on the database password.
+
+## Owner/admin bootstrap and live verification (2026-11-04)
+
+The live project had zero auth users and zero profiles, so no admin could exist.
+One owner identity was bootstrapped through the Supabase admin API: auth user
+`owner@promota.click`, profile `6e7ffa7c-33cb-4f73-b9ff-03229b070449`, role
+`owner`, state `active`. The profile row was inserted with role `owner`
+directly — the guard trigger only blocks role UPDATEs, so every later role
+change still has to go through `assign_role()`.
+
+| Claim | Evidence |
+|---|---|
+| Owner token accepted by the deployed API | `/api/me` → 200 `role=owner`; `/api/admin/stats` → 200 (live, 2026-11-04T04:00Z) |
+| Browser login link works | headless Chromium `--dump-dom` on `/admin.html#token=…`: `#app` visible, `#gate` hidden, `#whoami` = owner, token absent from the rendered DOM |
+| Fragment handoff is tested | `node apps/web/auth.test.mjs` — 12 PASS / 0 FAIL (owner/admin/support adopted; promoter refused; expired and malformed refused) |
+| Credential storage | `C:\Users\pc\.config\opencode\vault\PROMOTA-ADMIN-LOGIN.md` (outside the repo, never printed) |
+| Leaked token is dead | a token minted before the `SESSION_SECRET` rotation now returns 401 on `/api/me` |
+
+The account is permanent; the link is a 12-hour session. Passwordless OTP login
+lands on this profile only once `profiles.phone_e164` holds an owner-controlled
+number.

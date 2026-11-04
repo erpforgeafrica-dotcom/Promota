@@ -5,6 +5,44 @@ time; the symptom it produced is only an example. Newest first.
 
 ---
 
+## 13. A failed child process prints its own argv — including the secret you passed it
+
+**Symptom.** A headless-browser probe was given the one-tap admin link as a
+command-line argument. The browser shim failed to start, Node printed the
+spawn error object, and the object contained `spawnargs` — the full link with
+a live owner session token. The probe's success path redacted output; the
+failure path did not.
+
+**Pattern.** *Redaction on the happy path is not redaction.* Any secret passed
+through a layer you do not control (argv, env dumps, error objects, crash
+reporters) can surface exactly when things go wrong.
+
+**Rule adopted.** Do not put a bearer token in argv. If a tool only accepts
+the value there, catch every error and print a sanitised message — never the
+raw error object. When a token does escape, treat it as burned: rotate the
+signing secret, redeploy, and re-mint. With no other live users the rotation
+cost one build; the old token then returned 401.
+
+---
+
+## 12. A role guard that fires on UPDATE does not block the bootstrap INSERT
+
+**Symptom.** The live project had zero `auth.users` and zero `profiles`, and
+no account could hold `role.assign`, so `assign_role()` could never be called
+to create the first admin. The system looked permanently locked out.
+
+**Pattern.** *Read which event a guard fires on before believing it blocks
+everything.* `profiles_role_guard` is `before update of role`; an INSERT that
+carries `role = 'owner'` never touches it. The protection is against
+escalating an existing row, not against provisioning a new one.
+
+**Rule adopted.** Bootstrap the first privileged profile with a direct INSERT
+of the final role — never by disabling the trigger or writing a bypass flag —
+and leave every subsequent change on the audited `assign_role()` path. Write
+the asymmetry down, because the next reader will otherwise "fix" it.
+
+---
+
 ## 11. An enum value added in the migration that uses it fails on a fresh database
 
 **Symptom.** The promotion engine needed two new `point_kind` values and then
