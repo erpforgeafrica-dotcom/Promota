@@ -13,6 +13,8 @@
  *   2. auto-approves tasks whose poster went silent past auto_approve_at,
  *      then awards the points — keeping the "your money never hangs on someone
  *      else's delay" promise honest
+ *   3. expires promotion pairs whose delivery window closed with nothing
+ *      submitted, so a dead pair stops counting against a member's cap
  *
  * A topic with no handler is left QUEUED and logged once, not silently
  * dropped. Nothing is marked delivered that was not actually delivered.
@@ -197,6 +199,39 @@ async function payCashRedemption({ redemptionId, profileId }) {
   };
 }
 
+/* ------------------------------------------------------------- helpers */
+
+/**
+ * Tell one member something happened, by SMS.
+ *
+ * A member with no phone on file is a no-op, not a failure: the event itself
+ * is already a row (outbox + ledger + audit), there is simply nobody to text.
+ * A missing provider key still throws, exactly like the other notification
+ * handlers, so a dead SMS channel is visible in the outbox instead of being
+ * quietly swallowed.
+ */
+async function notifyProfile(profileId, message) {
+  if (!profileId) return { delivered: true, note: 'no profile on the event' };
+  const rows = await sb.select('profiles', `id=eq.${profileId}&select=phone_e164`);
+  const phone = rows?.[0]?.phone_e164;
+  if (!phone) return { delivered: true, note: 'no phone on file' };
+  await termii.sendSms({ to: phone, message });
+  return { delivered: true };
+}
+
+/** The two members of a pair, or null when the id does not resolve. */
+async function promoPairMembers(pairId) {
+  const rows = await sb.select('promo_pairs', `id=eq.${pairId}&select=profile_a,profile_b`);
+  return rows?.[0] || null;
+}
+
+/** The member on the other side of the pair from `actorId`. */
+async function promoPartnerOf(pairId, actorId) {
+  const pair = await promoPairMembers(pairId);
+  if (!pair) return null;
+  return pair.profile_a === actorId ? pair.profile_b : pair.profile_a;
+}
+
 const handlers = {
   /** A lead signed up: nothing to send yet, but it proves the fan-out works. */
   'lead.captured': async () => ({ delivered: true }),
@@ -338,6 +373,66 @@ const handlers = {
     });
     return { delivered: true };
   },
+
+  /* ---- mutual promotion ("Promote You") -------------------------------
+   * The points were already minted inside Postgres before each event was
+   * written. These handlers only tell the member what changed; they never
+   * compute, award or reverse a point.
+   */
+
+  'promotion.card_reviewed': async (p) => notifyProfile(
+    p.owner_id,
+    p.approve
+      ? 'Promota: your promotion card was approved and is now live.'
+      : 'Promota: your promotion card was not approved. Open the app to review it.',
+  ),
+
+  'promotion.pair_proposed': async (p) => notifyProfile(
+    p.to,
+    'Promota: a member invited you to promote each other. Open the app to accept or decline.',
+  ),
+
+  'promotion.pair_accepted': async (p) => {
+    // the proposer is the member who needs the deadline; accepted_by is the
+    // member who just acted and already knows.
+    const other = await promoPartnerOf(p.pair_id, p.accepted_by);
+    if (!other) return { delivered: true, note: `pair ${p.pair_id} not found` };
+    return notifyProfile(
+      other,
+      `Promota: your promotion pair is live. Deliver within ${p.deadline_hours} hours to earn.`,
+    );
+  },
+
+  'promotion.delivery_submitted': async (p) => {
+    // the partner still owes their side; the submitter already knows.
+    const other = await promoPartnerOf(p.pair_id, p.profile_id);
+    if (!other) return { delivered: true, note: `pair ${p.pair_id} not found` };
+    return notifyProfile(
+      other,
+      'Promota: your promotion partner delivered their side. Submit yours to unlock the mutual bonus.',
+    );
+  },
+
+  'promotion.delivery_rejected': async (p) => notifyProfile(
+    p.profile_id,
+    'Promota: your promotion delivery was not approved. Open the app to see why and resubmit.',
+  ),
+
+  'promotion.delivery_approved': async (p) => notifyProfile(
+    p.profile_id,
+    `Promota: your promotion delivery was approved. ${p.points} points added.`,
+  ),
+
+  'promotion.mutual_completed': async (p) => {
+    const pair = await promoPairMembers(p.pair_id);
+    if (!pair) return { delivered: true, note: `pair ${p.pair_id} not found` };
+    const message = `Promota: both sides delivered. ${p.bonus_points_each} bonus points added to each of you.`;
+    const results = await Promise.all([
+      notifyProfile(pair.profile_a, message),
+      notifyProfile(pair.profile_b, message),
+    ]);
+    return { delivered: results.every(r => r.delivered !== false) };
+  },
 };
 
 const unknownTopics = new Set();
@@ -406,7 +501,21 @@ export async function sweep() {
       log(`auto-approved task ${t.id} but award failed:`, String(e.message).slice(0, 160));
     }
   }
-  return { autoApproved: approved.length };
+
+  // A promotion pair whose deadline passed with nothing submitted is dead:
+  // the SQL function owns the rule (an in-flight or approved delivery keeps
+  // the pair alive), this loop only asks it to run. A failure here must not
+  // stop the task sweep, so it is logged and reported as zero expired.
+  let promoPairsExpired = 0;
+  try {
+    const expired = await sb.rpc('expire_promo_pairs');
+    promoPairsExpired = Number(Array.isArray(expired) ? expired[0] : expired) || 0;
+    if (promoPairsExpired > 0) log(`expired ${promoPairsExpired} promotion pair(s)`);
+  } catch (e) {
+    log('promotion expiry sweep failed:', String(e.message).slice(0, 160));
+  }
+
+  return { autoApproved: approved.length, promoPairsExpired };
 }
 
 /**

@@ -290,13 +290,28 @@ const routes = await import('../api/routes.mjs');
 /* ---------------------------------------------- worker handlers registered */
 {
   const worker = await import('../api/worker.mjs');
-  for (const t of [
-    'lead.captured', 'points.awarded', 'referral.qualified', 'redemption.requested',
-    'task.auto_approved', 'task.approved', 'task.claimed', 'referral_network.awarded',
-    'login.perfect_month',
-  ]) {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+
+  // The migrations are the contract for outbox topics. A hand-kept list drifts,
+  // and an unhooked topic stays queued until it dies — so scan the SQL that
+  // emits topics, add the ones the API emits directly, and require a handler
+  // for every one.
+  const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'db', 'migrations');
+  const emitted = new Set(['task.approved']); // emitted by the approval route path
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith('.sql')) continue;
+    const sql = readFileSync(join(dir, f), 'utf8');
+    const re = /insert\s+into\s+outbox\s*\(\s*topic\s*,\s*payload\s*\)\s*values\s*\(\s*'([a-zA-Z0-9_.]+)'/gi;
+    for (const m of sql.matchAll(re)) emitted.add(m[1]);
+  }
+  for (const t of [...emitted].sort()) {
     check(`worker handles outbox topic "${t}"`, typeof worker.handlers[t] === 'function');
   }
+  check('the migration scan found the promotion topics',
+    [...emitted].filter(t => t.startsWith('promotion.')).length === 7,
+    [...emitted].join(', '));
 }
 
 console.log(`\n  PASS ${pass}   FAIL ${fail}`);

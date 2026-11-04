@@ -61,6 +61,28 @@ Additional guards:
 - A second open pair between the same two members is refused.
 - A card in `review`/`active` cannot be duplicated by link (`unique(owner_id, link_url)`).
 
+## Worker and notifications
+
+Every topic `0020` writes to `outbox` has a handler in `api/worker.mjs`, and the
+API suite derives its topic list from the migrations themselves — a future event
+cannot ship unhooked without failing the gate.
+
+| Topic | What the handler does |
+|---|---|
+| `promotion.card_reviewed` | texts the card owner the review outcome |
+| `promotion.pair_proposed` | texts the invited member |
+| `promotion.pair_accepted` | texts the proposer with the delivery window |
+| `promotion.delivery_submitted` | texts the partner that their side is still owed |
+| `promotion.delivery_rejected` | texts the member whose delivery was rejected |
+| `promotion.delivery_approved` | texts the member that their points landed |
+| `promotion.mutual_completed` | texts both members that the bonus landed |
+
+An SMS is a notification, never the payment: the points are minted inside the
+SQL transaction that wrote the event. A member with no phone on file is a
+recorded no-op (`no phone on file`), not a failed payment. `sweep()` now calls
+`expire_promo_pairs()` on every pass, so an overdue pair stops counting against
+the member's open-pair cap without an operator calling the admin route.
+
 ## Points economics
 
 | Kind | When | Default | Setting |
