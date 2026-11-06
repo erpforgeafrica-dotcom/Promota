@@ -58,7 +58,14 @@ Everything is additive: new numbered migrations, new routes, new worker topics, 
 | A-6 | Raffle entry | Earned by task work only; **no cash purchase of tickets** | Confirm |
 | A-7 | Challenge entry | Free; original content; 18+; rights + disclosure accepted | Confirm |
 
-If the owner disagrees with any default, it changes a setting or a rule, not the architecture.
+**Owner confirmation — 2026-11-06 (in chat):** CONFIRMED ×7 with one scope change.
+
+- **A-1 confirmed** with the owner's clarification: **challenge/competition prize pools are FIXED per event** (set at creation — cash or item), NOT generated from monetization. The **60/40 creator/Promota split applies to the promotion of content generated from a competition** (monetization of the promoted content, e.g. the mutual-promotion-style paid deliveries).
+- **A-2 confirmed** (₦50,000 one-off at 100 active qualified referrals; independent legal copy sign-off still owed before public claim copy ships).
+- **A-3 confirmed** with the documented default ladder; final points prices go into `settings` at build time.
+- **A-4, A-5, A-6, A-7 confirmed as written.**
+
+No further owner decision blocks Phase 1. Deployment of Phases 0–0.5 remains blocked on the live-DB password (or the SQL-bundle paste) — see `STATUS.md`.
 
 ---
 

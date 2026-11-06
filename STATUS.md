@@ -172,3 +172,24 @@ change still has to go through `assign_role()`.
 The account is permanent; the link is a 12-hour session. Passwordless OTP login
 lands on this profile only once `profiles.phone_e164` holds an owner-controlled
 number.
+
+| 2026-11-06 — oral-log permanence |
+|---|
+
+- `profiles.phone_e164` now holds an owner-controlled number (masked
+  `+234…1733`): applied by service-key PATCH with an in-line readback
+  verification, 2026-11-06, owner-approved in chat. Role was not touched; the
+  role guard trigger only fires on role updates.
+- Termii OTP sign-in from that number now issues a session for the OWNER
+  profile instead of creating a new promoter (route resolves the profile by
+  `phone_e164=eq.`).
+- A fresh owner session was minted from the current `SESSION_SECRET` and
+  verified live: `GET /api/me` → 200 `role=owner`. The re-minted one-tap link
+  (12 h) is stored only in `C:\Users\pc\.config\opencode\vault\PROMOTA-ADMIN-LOGIN.md`
+  and supersedes the expired 2026-11-04 link. Numbers and passwords are
+  masked here; the vault file is the credential venue.
+- **Owner confirmed the enhancement-plan decisions in chat (2026-11-06)**:
+  A-1..A-7 in `docs/ENHANCEMENT-PLAN-20261103.md` §3, with the scope note that
+  challenge/competition prize pools are FIXED per event and 60/40 applies to
+  promoting content generated from a competition. No decision now blocks
+  Phase 1; only the deployment unblock (#DB password or SQL bundle) remains.
