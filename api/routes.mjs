@@ -929,4 +929,14 @@ export const routes = new Proxy(exactRoutes, {
   },
 });
 
+/**
+ * The path-parameter table, exported READ-ONLY for the audits and route-coverage
+ * checks. It returns copies so a caller cannot mutate the live router, and it
+ * exists because `Object.keys(routes)` can only see the exact table — a checker
+ * that ignores this list reports every dynamic route as a missing route.
+ */
+export const dynamicRoutes = Object.freeze(DYNAMIC_ROUTES.map((r) => Object.freeze({
+  method: r.method, re: r.re, params: Object.freeze([...r.params]),
+})));
+
 export { requireSession };

@@ -68,13 +68,13 @@ npm test
 ```
 
 That is the gate. It runs, in order: `apps/web/phone.test.mjs`,
-`apps/web/lead.test.mjs`, `api/api.test.mjs`, `scripts/checkImage.mjs`,
-`db/ledger.test.mjs`, `db/leads.test.mjs`, `db/points.test.mjs`,
-`db/policy.test.mjs`, `db/redemption-integrity.test.mjs`,
+`apps/web/lead.test.mjs`, `apps/web/auth.test.mjs`, `api/api.test.mjs`,
+`scripts/checkImage.mjs`, `db/ledger.test.mjs`, `db/leads.test.mjs`,
+`db/points.test.mjs`, `db/policy.test.mjs`, `db/redemption-integrity.test.mjs`,
 `db/views-evidence.test.mjs`, `db/mutual-promotion.test.mjs`,
-`providers/dataManager.test.mjs`, `providers/payoutCrypto.test.mjs` - the
-`db/*` suites run on real PostgreSQL via PGlite. Exit code 0 means the whole
-chain passed.
+`providers/termii.test.mjs`, `providers/dataManager.test.mjs`,
+`providers/payoutCrypto.test.mjs` - the `db/*` suites run on real PostgreSQL
+via PGlite. Exit code 0 means the whole chain passed.
 
 Other commands that matter:
 
