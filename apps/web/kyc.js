@@ -49,6 +49,131 @@
     box.className = 'form-status' + (kind ? ' ' + kind : '');
   }
 
+  /* ------------------------------------------------------------ KYC status */
+
+  var TIER_COPY = {
+    t0: 'Tier 0 — no KYC on file. Data and airtime work; cash payouts do not.',
+    t1: 'Tier 1 — legal name and bank details on file. An admin can raise you to tier 2.',
+    t2: 'Tier 2 — identity verified. Cash payouts are open to you.'
+  };
+
+  /* Paint the /api/me snapshot into the KYC status line. Idempotent: the
+     dashboard calls it from renderMe, the KYC tab calls it again on load. */
+  function paint(me) {
+    var box = byId('kyc-tier');
+    if (!box) return;
+    var p = (me && me.profile) || {};
+    var tier = String(p.kycTier || 't0').toLowerCase();
+    var bits = [TIER_COPY[tier] || ('Tier ' + tier + '.')];
+    bits.push(p.phoneVerified ? 'Phone verified.' : 'Phone not verified.');
+    bits.push(p.ageVerified ? 'Age 18+ verified.' : 'Age not verified yet.');
+    if (tier !== 't2') {
+      bits.push(p.ageVerified
+        ? 'Cash payouts need tier 2 — an admin raises the tier once your identity is on file.'
+        : 'Cash payouts need tier 2 plus a verified 18+ age. Use the identity form below.');
+    }
+    box.textContent = bits.join(' ');
+    box.className = 'fine';
+  }
+
+  function refreshMe() {
+    return Auth.api('/api/me').then(function (r) {
+      if (r.status === 200 && r.body) paint(r.body);
+    }).catch(function () { /* the status line keeps its last known value */ });
+  }
+
+  /* ------------------------------------------------------- basic KYC (t1) */
+
+  function submitBasic(e) {
+    e.preventDefault();
+    var legalName = value('kyc-basic-legal-name');
+    var bankName = value('kyc-basic-bank-name');
+    var bankLast4 = value('kyc-basic-last4');
+    var box = byId('kyc-basic-status');
+
+    function bad(msg) {
+      if (box) { box.textContent = msg; box.className = 'form-status error'; }
+      FB && FB.err(msg);
+      return false;
+    }
+    if (!/^[A-Za-z][A-Za-z .'-]{1,119}$/.test(legalName)) return bad('Enter your legal full name as it appears at your bank.');
+    if (!bankName) return bad('Enter your bank name.');
+    if (!/^[0-9]{4}$/.test(bankLast4)) return bad('Enter only the last 4 digits of your account number.');
+
+    var btn = byId('kyc-basic-submit');
+    if (btn) btn.disabled = true;
+    if (box) { box.textContent = 'Saving…'; box.className = 'form-status'; }
+
+    return Auth.api('/api/v1/kyc/basic', {
+      method: 'POST',
+      body: { legalName: legalName, bankName: bankName, bankLast4: bankLast4 }
+    }).then(function (r) {
+      if (btn) btn.disabled = false;
+      if (r.status === 200) {
+        if (box) {
+          box.textContent = 'Saved. Your KYC tier is ' + String((r.body && r.body.kycTier) || 't1').toUpperCase() + '.';
+          box.className = 'form-status ok';
+        }
+        FB && FB.ok('KYC details saved.');
+        refreshMe();
+        return r.body;
+      }
+      if (r.status === 401) { Auth.clearToken(); return bad('Your session expired. Sign in again.'); }
+      return bad((r.body && r.body.error) || 'Could not save your KYC details.');
+    });
+  }
+
+  /* ---------------------------------------------------- identity KYC (t2) */
+
+  function submitIdentity(e) {
+    e.preventDefault();
+    var idType = value('kyc-id-type').toUpperCase();
+    var idValue = value('kyc-id-value');
+    var dob = value('kyc-dob');
+    var box = byId('kyc-identity-status');
+
+    function bad(msg) {
+      if (box) { box.textContent = msg; box.className = 'form-status error'; }
+      FB && FB.err(msg);
+      return false;
+    }
+    if (idType !== 'NIN' && idType !== 'BVN') return bad('Choose NIN or BVN.');
+    if (!/^[0-9]{11}$/.test(idValue)) return bad('A NIN or BVN is 11 digits.');
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dob)) return bad('Enter your date of birth.');
+
+    var btn = byId('kyc-identity-submit');
+    if (btn) btn.disabled = true;
+    if (box) { box.textContent = 'Checking…'; box.className = 'form-status'; }
+
+    return Auth.api('/api/v1/kyc/identity', {
+      method: 'POST',
+      body: { idType: idType, idValue: idValue, dob: dob }
+    }).then(function (r) {
+      if (btn) btn.disabled = false;
+      if (r.status === 200) {
+        /* The number is never sent back; drop it from the DOM anyway. */
+        var el = byId('kyc-id-value');
+        if (el) el.value = '';
+        if (box) {
+          box.textContent = 'Identity stored as a fingerprint and your age is verified. Cash payouts need tier 2 — an admin raises the tier.';
+          box.className = 'form-status ok';
+        }
+        FB && FB.ok('Identity verified.');
+        refreshMe();
+        return r.body;
+      }
+      if (r.status === 401) { Auth.clearToken(); return bad('Your session expired. Sign in again.'); }
+      return bad((r.body && r.body.error) || 'Could not verify your identity.');
+    });
+  }
+
+  function bindForm(id, handler) {
+    var form = byId(id);
+    if (!form || form.getAttribute('data-kyc-bound') === '1') return;
+    form.setAttribute('data-kyc-bound', '1');
+    form.addEventListener('submit', handler);
+  }
+
   /* Paint the stored state. set=true -> the account is on file and we show
      the masked number; set=false -> there is nothing to pay out to yet.
      failureReason always wins over the verified timestamp. */
@@ -73,8 +198,9 @@
     }
   }
 
-  /* GET /api/v1/kyc/payout-account */
+  /* GET /api/v1/kyc/payout-account + GET /api/me for the tier line */
   function load() {
+    refreshMe();
     var box = byId(STATE_ID);
     if (box && !box.textContent) box.textContent = 'Loading your payout account…';
     return Auth.api('/api/v1/kyc/payout-account').then(function (r) {
@@ -161,16 +287,15 @@
   }
 
   function bind() {
-    var form = byId(FORM_ID);
-    if (!form) return;
-    if (form.getAttribute('data-kyc-bound') === '1') return;
-    form.setAttribute('data-kyc-bound', '1');
-    form.addEventListener('submit', onSubmit);
+    bindForm(FORM_ID, onSubmit);
+    bindForm('kyc-basic-form', submitBasic);
+    bindForm('kyc-identity-form', submitIdentity);
     load();
   }
 
   window.PromotaKyc = {
     bind: bind,
-    load: load
+    load: load,
+    paint: paint
   };
 })();

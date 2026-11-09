@@ -58,6 +58,7 @@
       p.hidden = p.id !== 'pane-' + id;
     });
     if (id === 'kyc' && window.PromotaKyc && window.PromotaKyc.load) window.PromotaKyc.load();
+    if (id === 'promo' && window.PromotaPromotion && window.PromotaPromotion.load) window.PromotaPromotion.load();
   }
   document.querySelectorAll('.tab').forEach(function (t) {
     t.addEventListener('click', function () { setPane(t.getAttribute('data-pane')); });
@@ -107,6 +108,7 @@
       adminLink.hidden = false;
       adminLink.addEventListener('click', function () { window.location.href = '/admin.html'; });
     }
+    if (window.PromotaKyc && window.PromotaKyc.paint) window.PromotaKyc.paint(me);
   }
 
   var ACTION_LABEL = {
@@ -633,6 +635,7 @@
     if (!me) return;
     redeemPaneBind();
     if (window.PromotaKyc && window.PromotaKyc.bind) window.PromotaKyc.bind();
+    if (window.PromotaPromotion && window.PromotaPromotion.bind) window.PromotaPromotion.bind();
     return Promise.all([
       loadPolicy(),
       loadTasks(),

@@ -326,6 +326,35 @@ const orphans = [...routes].filter((r) => !used.has(r));
 if (orphans.length === 0) ok('every server route is called by some page');
 else info(`${orphans.length} route(s) with no page caller (internal / admin / partner use)`, orphans.join(', '));
 
+/* ------------------------------------------------- required page callers */
+/* The dead-call check only proves the paths exist. It cannot see a feature
+ * whose endpoint was built but whose page never wired it — that is exactly how
+ * the KYC tier forms and the whole mutual-promotion flow sat unreachable. These
+ * routes are on the launch path: a page must call each of them. */
+const REQUIRED_CALLERS = [
+  'POST /api/v1/kyc/basic',
+  'POST /api/v1/kyc/identity',
+  'GET /api/v1/promotion/cards',
+  'POST /api/v1/promotion/cards',
+  'GET /api/v1/promotion/cards/mine',
+  'GET /api/v1/promotion/pairs',
+  'POST /api/v1/promotion/pairs',
+  'POST /api/v1/promotion/pairs/:id/accept',
+  'POST /api/v1/promotion/pairs/:id/deliver',
+  'GET /api/v1/admin/promotion/cards',
+  'POST /api/v1/admin/promotion/cards/:id/review',
+  'GET /api/v1/admin/promotion/deliveries',
+  'POST /api/v1/admin/promotion/deliveries/:id/review',
+  'POST /api/v1/admin/promotion/expire',
+];
+const uncalled = REQUIRED_CALLERS.filter((k) => !calls.has(k));
+if (uncalled.length === 0) {
+  ok(`every launch-critical route has a page caller (${REQUIRED_CALLERS.length} checked)`);
+} else {
+  bad('a launch-critical route has no page caller',
+    uncalled.map((k) => `${k} — no page calls it`).join('\n             '));
+}
+
 /* ------------------------------------------------------------- dead pages */
 const pageLinks = new Map();
 for (const file of htmlFiles) {

@@ -65,8 +65,9 @@
     });
     if (id === 'plugins' && !lazyLoaded.plugins) { lazyLoaded.plugins = true; loadPlugins(); }
     if (id === 'mining' && !lazyLoaded.mining) { lazyLoaded.mining = true; loadMining(); }
+    if (id === 'promotions' && !lazyLoaded.promotions) { lazyLoaded.promotions = true; loadPromotions(); }
   }
-  var lazyLoaded = { plugins: false, mining: false };
+  var lazyLoaded = { plugins: false, mining: false, promotions: false };
   document.querySelectorAll('.tab').forEach(function (t) {
     t.addEventListener('click', function () { setPane(t.getAttribute('data-pane')); });
   });
@@ -572,6 +573,156 @@
       if (body) body.innerHTML = '<tr><td colspan="6" class="fine">' + esc((r.body && r.body.error) || 'Could not load KYC.') + '</td></tr>';
     });
   }
+
+  /* ---------------- mutual promotion ---------------- */
+
+  function promoCardRow(c) {
+    return '<tr><td>' + esc(c.title || 'Untitled card') + '<br><span class="fine">' + esc(c.summary || '') + '</span></td>' +
+      '<td>' + badge(c.kind) + '</td>' +
+      '<td>' + short(c.owner_id) + '</td>' +
+      '<td>' + (c.link_url ? '<a href="' + esc(c.link_url) + '" target="_blank" rel="noopener noreferrer">open</a>' : '–') + '</td>' +
+      '<td>' + when(c.created_at) + '</td>' +
+      '<td><button class="btn primary btn-sm" type="button" data-promo-card="' + esc(String(c.id)) + '" data-approve="1">Approve</button> ' +
+      '<button class="btn ghost btn-sm" type="button" data-promo-card="' + esc(String(c.id)) + '" data-approve="0">Reject</button></td></tr>';
+  }
+
+  function promoDeliveryRow(d) {
+    return '<tr><td>' + short(d.id) + '<br><span class="fine">member ' + short(d.profile_id) + '</span></td>' +
+      '<td>' + short(d.pair_id) + '</td>' +
+      '<td>' + esc(d.platform || '–') + '</td>' +
+      '<td>' + esc(d.disclosure || '–') + '</td>' +
+      '<td>' + (d.post_url ? '<a href="' + esc(d.post_url) + '" target="_blank" rel="noopener noreferrer">post</a>' : '–') + '</td>' +
+      '<td>' + when(d.created_at) + '</td>' +
+      '<td><button class="btn primary btn-sm" type="button" data-promo-delivery="' + esc(String(d.id)) + '" data-approve="1">Approve</button> ' +
+      '<button class="btn ghost btn-sm" type="button" data-promo-delivery="' + esc(String(d.id)) + '" data-approve="0">Reject</button></td></tr>';
+  }
+
+  function bindPromoActions() {
+    var cardsBody = document.getElementById('promo-cards-body');
+    if (cardsBody) {
+      cardsBody.querySelectorAll('[data-promo-card]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var id = b.getAttribute('data-promo-card');
+          var approve = b.getAttribute('data-approve') === '1';
+          var note = window.prompt(approve
+            ? 'Optional note for the member (leave blank to approve as-is):'
+            : 'Why is this card rejected? The member sees this note.');
+          if (note === null) return;
+          if (!approve && String(note).trim().length < 3) {
+            say('promotions-status', 'A rejection needs a reason of at least 3 characters.', true);
+            return;
+          }
+          b.disabled = true;
+          say('promotions-status', approve ? 'Approving the card…' : 'Rejecting the card…', false);
+          Auth.api('/api/v1/admin/promotion/cards/' + encodeURIComponent(id) + '/review', {
+            method: 'POST',
+            body: { approve: approve, note: String(note).trim() || null }
+          }).then(function (r) {
+            if (r.status === 200) {
+              say('promotions-status', 'Card ' + ((r.body && r.body.state) || (approve ? 'active' : 'rejected')) + '.', false);
+              FB && FB.ok('Promotion card ' + (approve ? 'approved' : 'rejected') + '.');
+              loadPromotions();
+            } else {
+              b.disabled = false;
+              say('promotions-status', (r.body && r.body.error) || 'The review was refused.', true);
+              FB && FB.err((r.body && r.body.error) || 'The review was refused.');
+            }
+          });
+        });
+      });
+    }
+
+    var deliveriesBody = document.getElementById('promo-deliveries-body');
+    if (deliveriesBody) {
+      deliveriesBody.querySelectorAll('[data-promo-delivery]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var id = b.getAttribute('data-promo-delivery');
+          var approve = b.getAttribute('data-approve') === '1';
+          var note = window.prompt(approve
+            ? 'Optional note for the member (leave blank to approve):'
+            : 'Why is this delivery rejected? The member sees this reason.');
+          if (note === null) return;
+          if (!approve && String(note).trim().length < 3) {
+            say('promotions-status', 'A rejection needs a reason of at least 3 characters.', true);
+            return;
+          }
+          if (approve && !window.confirm('Approve this delivery? Approving mints the points in Postgres.')) return;
+          b.disabled = true;
+          say('promotions-status', approve ? 'Approving the delivery…' : 'Rejecting the delivery…', false);
+          Auth.api('/api/v1/admin/promotion/deliveries/' + encodeURIComponent(id) + '/review', {
+            method: 'POST',
+            body: { approve: approve, reason: String(note).trim() || null }
+          }).then(function (r) {
+            if (r.status === 200) {
+              var pts = r.body && r.body.points != null ? ' ' + r.body.points + ' points minted.' : '';
+              say('promotions-status', 'Delivery ' + (approve ? 'approved.' + pts : 'rejected.'), false);
+              FB && FB.ok('Delivery ' + (approve ? 'approved.' : 'rejected.'));
+              loadPromotions();
+            } else {
+              b.disabled = false;
+              say('promotions-status', (r.body && r.body.error) || 'The review was refused.', true);
+              FB && FB.err((r.body && r.body.error) || 'The review was refused.');
+            }
+          });
+        });
+      });
+    }
+  }
+
+  function loadPromotions() {
+    return Promise.all([
+      Auth.api('/api/v1/admin/promotion/cards?state=review'),
+      Auth.api('/api/v1/admin/promotion/deliveries?state=submitted')
+    ]).then(function (rs) {
+      var cards = rs[0], dels = rs[1];
+      var cardsBody = document.getElementById('promo-cards-body');
+      var delsBody = document.getElementById('promo-deliveries-body');
+      var failed = null;
+
+      if (cards.status === 200 && cards.body) {
+        if (cardsBody) cardsBody.innerHTML = (cards.body.cards || []).length
+          ? cards.body.cards.map(promoCardRow).join('')
+          : '<tr><td colspan="6" class="fine">No cards waiting for review.</td></tr>';
+      } else {
+        failed = failed || cards;
+        if (cardsBody) cardsBody.innerHTML = '<tr><td colspan="6" class="fine">' + esc((cards.body && cards.body.error) || 'Could not load promotion cards.') + '</td></tr>';
+      }
+
+      if (dels.status === 200 && dels.body) {
+        if (delsBody) delsBody.innerHTML = (dels.body.deliveries || []).length
+          ? dels.body.deliveries.map(promoDeliveryRow).join('')
+          : '<tr><td colspan="7" class="fine">No deliveries waiting for review.</td></tr>';
+      } else {
+        failed = failed || dels;
+        if (delsBody) delsBody.innerHTML = '<tr><td colspan="7" class="fine">' + esc((dels.body && dels.body.error) || 'Could not load promotion deliveries.') + '</td></tr>';
+      }
+
+      if (failed) {
+        say('promotions-status', (failed.body && failed.body.error) || 'Some promotion data could not load.', true);
+        return;
+      }
+      if (cardsBody && delsBody) say('promotions-status', '', false);
+      bindPromoActions();
+    });
+  }
+
+  var promoExpireBtn = document.getElementById('promo-expire');
+  if (promoExpireBtn) promoExpireBtn.addEventListener('click', function () {
+    promoExpireBtn.disabled = true;
+    say('promotions-status', 'Running the expiry sweep…', false);
+    Auth.api('/api/v1/admin/promotion/expire', { method: 'POST' }).then(function (r) {
+      promoExpireBtn.disabled = false;
+      if (r.status === 200) {
+        var n = (r.body && r.body.expired) || 0;
+        say('promotions-status', n + ' pair' + (n === 1 ? '' : 's') + ' expired.', false);
+        FB && FB.ok(n + ' promotion pair' + (n === 1 ? '' : 's') + ' expired.');
+        loadPromotions();
+        return;
+      }
+      say('promotions-status', (r.body && r.body.error) || 'The expiry sweep failed.', true);
+      FB && FB.err((r.body && r.body.error) || 'The expiry sweep failed.');
+    });
+  });
 
   /* ---------------- mining ---------------- */
 

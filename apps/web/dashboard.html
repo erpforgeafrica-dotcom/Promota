@@ -66,6 +66,7 @@
         <button class="tab active" role="tab" aria-checked="true" data-pane="available" type="button">Available tasks</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="mine" type="button">My tasks</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="money" type="button">Earnings &amp; redemption</button>
+        <button class="tab" role="tab" aria-checked="false" data-pane="promo" type="button">Promote you</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="kyc" type="button">Payout account</button>
         <button class="tab" role="tab" aria-checked="false" data-pane="referrals" type="button">Referrals</button>
       </div>
@@ -122,8 +123,126 @@
         <div class="table-wrap"><table class="queue-table" id="entries-table"><thead><tr><th>When</th><th>Kind</th><th>Points</th><th>Memo</th></tr></thead><tbody id="entries-body"></tbody></table></div>
       </section>
 
+      <!-- Promote you (mutual promotion) -->
+      <section id="pane-promo" class="pane" role="tabpanel" hidden>
+        <div class="panel">
+          <h2>Your promotion cards</h2>
+          <p class="fine">Publish what you want other members to promote. A card is reviewed by an admin, then it goes live. You can hold up to five cards in review or live at once.</p>
+          <div id="promo-cards-status" class="form-status" role="status"></div>
+          <div id="promo-cards-list" class="task-list"></div>
+          <h3>Create a card</h3>
+          <form id="promo-card-form">
+            <div class="field">
+              <label for="promo-kind">What are you promoting?</label>
+              <select id="promo-kind">
+                <option value="person">Myself</option>
+                <option value="creator">My content</option>
+                <option value="business">My business</option>
+                <option value="cause">A cause</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="promo-title">Title</label>
+              <input type="text" id="promo-title" maxlength="120" required placeholder="Short headline, 3&ndash;120 characters">
+            </div>
+            <div class="field">
+              <label for="promo-summary">Summary</label>
+              <textarea id="promo-summary" rows="3" maxlength="600" required placeholder="What should the other member say? 10&ndash;600 characters"></textarea>
+            </div>
+            <div class="field">
+              <label for="promo-link">Destination link</label>
+              <input type="url" id="promo-link" required placeholder="https:// your page, shop or post">
+            </div>
+            <div class="field">
+              <label for="promo-media">Creative URL (optional)</label>
+              <input type="url" id="promo-media" placeholder="https:// image or video">
+            </div>
+            <div class="grid2">
+              <div class="field">
+                <label for="promo-category">Category (optional)</label>
+                <input type="text" id="promo-category" maxlength="40" placeholder="fashion, food, music">
+              </div>
+              <div class="field">
+                <label for="promo-city">City (optional)</label>
+                <input type="text" id="promo-city" maxlength="80" placeholder="Lagos">
+              </div>
+            </div>
+            <button type="submit" class="btn primary" id="promo-card-submit">Submit card for review</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h2>Promote another member</h2>
+          <p class="fine">Pick one of your live cards, then propose a swap with a member whose card you will post. When they accept, you both post the other&rsquo;s card and both get paid.</p>
+          <div class="field">
+            <label for="promo-self-card">Your live card</label>
+            <select id="promo-self-card"></select>
+          </div>
+          <p class="fine" id="promo-self-hint"></p>
+          <div id="promo-browse-status" class="form-status" role="status"></div>
+          <div id="promo-browse-list" class="task-list"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Your swaps</h2>
+          <p class="fine">A swap starts when the invited member accepts. Both sides must deliver before the deadline, and points are minted only when an admin approves a delivery.</p>
+          <div id="promo-pairs-status" class="form-status" role="status"></div>
+          <div id="promo-pairs-list" class="task-list"></div>
+        </div>
+      </section>
+
       <!-- Payout account (KYC) -->
       <section id="pane-kyc" class="pane" role="tabpanel" hidden>
+        <div class="panel">
+          <h2>Your KYC status</h2>
+          <p class="fine" id="kyc-tier">Loading your KYC status&hellip;</p>
+        </div>
+
+        <div class="panel">
+          <h2>Payout KYC &mdash; legal name and bank</h2>
+          <p class="fine">Your legal name and the last four digits of your bank account. An admin checks this against your payout account and raises you to tier 1.</p>
+          <form id="kyc-basic-form">
+            <div class="field">
+              <label for="kyc-basic-legal-name">Legal name</label>
+              <input type="text" id="kyc-basic-legal-name" maxlength="120" required autocomplete="name" placeholder="As it appears at your bank">
+            </div>
+            <div class="field">
+              <label for="kyc-basic-bank-name">Bank name</label>
+              <input type="text" id="kyc-basic-bank-name" maxlength="120" required placeholder="Guaranty Trust Bank">
+            </div>
+            <div class="field">
+              <label for="kyc-basic-last4">Last 4 digits of your account</label>
+              <input type="text" id="kyc-basic-last4" maxlength="4" required inputmode="numeric" autocomplete="off" placeholder="6789">
+            </div>
+            <p class="form-status" id="kyc-basic-status" role="status"></p>
+            <button type="submit" class="btn primary" id="kyc-basic-submit">Save KYC details</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h2>Identity KYC &mdash; NIN or BVN (cash payouts)</h2>
+          <p class="fine">Cash payouts need tier 2 and a verified 18+ age. Only an HMAC fingerprint of your NIN or BVN is stored &mdash; the number itself is never kept.</p>
+          <form id="kyc-identity-form">
+            <div class="field">
+              <label for="kyc-id-type">ID type</label>
+              <select id="kyc-id-type">
+                <option value="NIN">NIN</option>
+                <option value="BVN">BVN</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="kyc-id-value">ID number</label>
+              <input type="text" id="kyc-id-value" maxlength="11" required inputmode="numeric" autocomplete="off" placeholder="11 digits">
+            </div>
+            <div class="field">
+              <label for="kyc-dob">Date of birth</label>
+              <input type="date" id="kyc-dob" required>
+            </div>
+            <p class="form-status" id="kyc-identity-status" role="status"></p>
+            <button type="submit" class="btn primary" id="kyc-identity-submit">Verify my identity</button>
+          </form>
+        </div>
+
         <div class="panel">
           <h2>Payout account</h2>
           <p class="fine" id="kyc-state">Loading your payout account…</p>
@@ -174,6 +293,7 @@
   <script src="/feedback.js"></script>
   <script src="/auth.js"></script>
   <script src="/kyc.js"></script>
+  <script src="/promotion.js"></script>
   <script src="/dashboard.js"></script>
 </body>
 </html>
