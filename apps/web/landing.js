@@ -31,7 +31,11 @@
   /* ---------- auth modal: phone step -> OTP step -> dashboard ---------- */
   var modal = document.getElementById('modal');
   var authForm = document.getElementById('auth-form');
-  if (!modal || !authForm || !window.PromotaAuth) return;
+  /* about.html and contact.html load this file for the nav, mobile menu, FAQ
+     and theme wiring but ship no auth modal and no auth.js. Only the modal
+     flow needs those, so gate it behind a flag instead of returning early —
+     an early return silenced every handler below on those two pages. */
+  var authModal = Boolean(modal && authForm && window.PromotaAuth);
 
   var modalTitle = document.getElementById('modal-title');
   var modalSubtitle = document.getElementById('modal-subtitle');
@@ -95,6 +99,7 @@
   }
 
   function openModal(requestedMode) {
+    if (!authModal) return;
     mode = requestedMode === 'signup' ? 'signup' : 'login';
     if (modalTitle) modalTitle.textContent = mode === 'signup' ? 'Sign up' : 'Sign in';
     if (modalSubtitle) modalSubtitle.textContent = mode === 'signup'
@@ -105,14 +110,16 @@
     modal.hidden = false;
     if (phoneInput) phoneInput.focus();
   }
-  function closeModalFn() { modal.hidden = true; }
+  function closeModalFn() { if (modal) modal.hidden = true; }
 
-  if (closeModalBtn) closeModalBtn.addEventListener('click', closeModalFn);
-  modal.addEventListener('click', function (e) { if (e.target === modal) closeModalFn(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !modal.hidden) closeModalFn();
-  });
-  if (backBtn) backBtn.addEventListener('click', showPhoneStep);
+  if (authModal) {
+    if (closeModalBtn) closeModalBtn.addEventListener('click', closeModalFn);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModalFn(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) closeModalFn();
+    });
+    if (backBtn) backBtn.addEventListener('click', showPhoneStep);
+  }
 
   /* One delegated handler: the CURRENT data-auth value decides the action, so
      the signed-in rename below can flip buttons to 'dashboard' safely. */
@@ -125,6 +132,7 @@
       window.location.href = next || '/dashboard.html';
       return;
     }
+    if (!authModal) return;
     openModal(requested || 'login');
   });
   ['login-btn', 'signup-btn', 'login-cta', 'signup-cta', 'final-cta'].forEach(function (id) {
@@ -133,7 +141,7 @@
     btn.setAttribute('data-auth', id.indexOf('signup') === 0 ? 'signup' : 'login');
   });
 
-  authForm.addEventListener('submit', function (e) {
+  if (authForm) authForm.addEventListener('submit', function (e) {
     e.preventDefault();
     if (busy) return;
 
@@ -193,7 +201,7 @@
   });
 
   /* ---------- signed-in state: nav buttons become a dashboard link ---------- */
-  if (window.PromotaAuth.getToken()) {
+  if (window.PromotaAuth && window.PromotaAuth.getToken && window.PromotaAuth.getToken()) {
     var signedInTarget = next || '/dashboard.html';
     ['login-btn', 'login-cta', 'final-cta', 'login-m', 'signup-btn', 'signup-cta', 'signup-m'].forEach(function (id) {
       var b = document.getElementById(id);

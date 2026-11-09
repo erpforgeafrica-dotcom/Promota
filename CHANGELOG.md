@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `scripts/audit-ui-wiring.mjs` runs as part of `npm test` (`npm run audit:ui`): it fails when a page calls a path the router does not serve, and when one of 14 launch-critical routes (KYC basic/identity, the whole mutual-promotion flow, admin promotion review and expiry) has no page caller.
+- `scripts/checkDomContract.mjs` (`npm run audit:dom`): fails when a page script looks up an element id the page never ships. Ids the script creates itself (`el.id = 'x'`, injected markup) and ids a shared script only needs on some host pages are classified explicitly rather than silently ignored.
+- Promote-you dashboard tab and admin Promotions pane (cards in review, deliveries in review, approve/reject with a note, expiry sweep) — the mutual-promotion API previously had no page calling it.
+
+### Fixed
+- `apps/web/landing.js` returned early whenever the auth modal was absent, silently disabling the mobile menu, the mobile theme toggle, the FAQ accordion and `FB.ready()` on `about.html` and `contact.html`. The modal wiring is now gated by a flag; the rest of the page always wires.
+
 ## [0.2.0] - 2026-10-07
 
 ### Added

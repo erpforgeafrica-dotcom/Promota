@@ -73,8 +73,10 @@ That is the gate. It runs, in order: `apps/web/phone.test.mjs`,
 `db/points.test.mjs`, `db/policy.test.mjs`, `db/redemption-integrity.test.mjs`,
 `db/views-evidence.test.mjs`, `db/mutual-promotion.test.mjs`,
 `providers/termii.test.mjs`, `providers/dataManager.test.mjs`,
-`providers/payoutCrypto.test.mjs` - the `db/*` suites run on real PostgreSQL
-via PGlite. Exit code 0 means the whole chain passed.
+`providers/payoutCrypto.test.mjs`, `scripts/audit-ui-wiring.mjs`,
+`scripts/checkDomContract.mjs` - the `db/*` suites run on real PostgreSQL
+via PGlite, the two `scripts/` entries are the static wiring gates. Exit code
+0 means the whole chain passed.
 
 Other commands that matter:
 
@@ -86,6 +88,8 @@ Other commands that matter:
 | `npm run db:remote` | Applies migrations to the live Supabase project |
 | `npm run db:probe` | Live Supabase reachability |
 | `npm run db:live` | `db/live.proof.mjs` — RLS proven over HTTPS with real JWTs |
+| `npm run audit:ui` | Static: every UI call has a route, and 14 launch-critical routes have a page caller |
+| `npm run audit:dom` | Static: every element id a page script reaches for is shipped by that page |
 | `node scripts/checkImage.mjs` | The Docker image ships everything `server.mjs` imports |
 | `node scripts/verifyLive.mjs <url>` | The deployed site actually works end to end |
 | `node scripts/predeploy-check.js` | Deploy gate: env names, migration parity, CSP snapshot |
@@ -110,7 +114,8 @@ db/migrations/     forward-only 0001..0020 — the place business rules live
 db/*.test.mjs      PGlite suites (ledger, leads, points, policy, redemption-integrity,
                    views-evidence, mutual-promotion)
 scripts/           migrateUp.mjs, migrateRemote.mjs, migrations.mjs, checkImage.mjs,
-                   checkSite.mjs, serve.mjs, verifyLive.mjs, predeploy-check.js
+                   checkSite.mjs, serve.mjs, verifyLive.mjs, predeploy-check.js,
+                   audit-live.mjs, audit-ui-wiring.mjs, checkDomContract.mjs
 audit/             the house review format: SPRINT22-CURRENT-REVIEW.md is canonical
 docs/              BRAND.md, USER-GUIDE.md, ADMIN-GUIDE.md, REWARDS.md, LOTTERY.md
 server.mjs         HTTP server: static site, /api, rate limiting, CSP headers

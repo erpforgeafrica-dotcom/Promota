@@ -152,6 +152,23 @@ another member's pair, and browser write denial); their venue is
 **Verdict:** the feature is complete in `main` and proven locally. Live remains
 owner-blocked on the database password.
 
+## UI wiring gates (2026-11-09)
+
+The promotion and KYC APIs were complete but no page called them, and
+`landing.js` returned early on pages without the auth modal, which silently
+killed the mobile menu, the mobile theme toggle and the FAQ accordion on
+`about.html` and `contact.html`. Both classes are now caught by the test gate.
+
+| Claim | Evidence |
+|---|---|
+| Every UI call has a server route | `npm run audit:ui` — 5 PASS / 0 FAIL (64 distinct calls, 13 scripts) |
+| Every launch-critical route has a page caller | `npm run audit:ui` — 14 routes checked (KYC basic/identity, promotion cards/pairs/deliveries, admin review + expiry) |
+| Every page-script element lookup has a target | `npm run audit:dom` — 2 PASS / 0 FAIL (11 pages, 10 scripts, 252 refs) |
+| A missing id fails the gate | negative run with a probe id in `kyc.js` — 1 FAIL, exit 1, then restored |
+| Landing nav works without the auth modal | browser run on `about.html`/`contact.html`: `#menu-btn` toggles `#mobile-menu` (`open:true`, `aria-expanded:true`), `#themeBtnMenu` flips `data-theme` both ways, zero page errors |
+| Sign-in modal still opens | browser run on `index.html`: click `[data-auth="login"]` → `#modal.hidden === false`; Escape closes |
+| Full gate | `npm test` EXIT 0; `npm run site` 187 PASS / 0 FAIL |
+
 ## Owner/admin bootstrap and live verification (2026-11-04)
 
 The live project had zero auth users and zero profiles, so no admin could exist.
