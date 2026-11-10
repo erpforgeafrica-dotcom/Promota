@@ -212,6 +212,16 @@ These are not hypotheticals. Each one cost a session.
    and could be corrected in place; `0008`, `0012` and `0013` were applied
    and were fixed forward in `0017`. Check `/readyz` (repo vs applied) before
    deciding which side of that line a file is on.
+7. **A provider swap is not done until something scans for the old vendor.**
+   The BulkSMS switch converted the adapters, the facade, the route table and
+   the admin probe, and the whole suite was green — while `api/worker.mjs`
+   still sent four notification SMS through `termii.sendSms`. Sign-in would
+   have moved vendors and the outbox kept billing the old one, silently.
+   `providers/sms.test.mjs` now fails the build on any direct vendor import,
+   and `scripts/deploy-hostinger.mjs` pushes the new provider's env keys.
+   Before declaring any provider swap released: grep the old vendor name
+   across `.mjs`, `.js`, `.md` and `.opencode/`, and check the deploy env
+   allowlist, not just the code path the tests cover.
 
 ## Rollback
 
