@@ -1,0 +1,7 @@
+Post-flip, 2026-11-09. After `deploy-hostinger.mjs env` + `restart`.
+
+GET https://promota.click/readyz
+-> HTTP 200: {"ready":true,"checks":{"supabase":{"ok":true},"flags":{"ok":true},"migrations":{"ok":true,"repo":20,"applied":20}}}
+
+First time in the project's history that production readyz reports applied == repo (20/20).
+Poll command: loop every 8 s up to 3 min; first 200 response shown.

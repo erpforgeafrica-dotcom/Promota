@@ -1,0 +1,67 @@
+PS> node scripts/audit-live.mjs https://promota.click
+  NOTE  no service credential or no profiles — staff roles will be UNVERIFIED
+
+  Promota live route audit — https://promota.click
+  identities: anonymous
+
+  PASS  GET /healthz                            anonymous   200   ok
+  PASS  GET /api/plans                          anonymous   401   sign in required
+  PASS  GET /api/blog                           anonymous   200   posts
+  PASS  GET /api/blog/does-not-exist            anonymous   404   post not found   <- expected 404
+  FAIL  POST /api/auth/otp/request              anonymous   502   could not send the code: termii sms/otp/send: Country Inactive. Cont   <- server error
+  PASS  POST /api/auth/otp/verify               anonymous   400   that code is not valid
+  PASS  POST /api/webhooks/flutterwave          anonymous   401   webhook rejected: missing verif-hash header
+  PASS  GET /api/me                             anonymous   401   sign in required
+  PASS  GET /api/tasks                          anonymous   401   sign in required
+  PASS  GET /api/tasks/mine                     anonymous   401   sign in required
+  PASS  GET /api/policy                         anonymous   401   sign in required
+  PASS  POST /api/policy/ack                    anonymous   401   sign in required
+  PASS  POST /api/redeem                        anonymous   401   sign in required
+  PASS  GET /api/referrals                      anonymous   401   sign in required
+  PASS  GET /api/mining/status                  anonymous   401   sign in required
+  PASS  GET /api/mining/traces                  anonymous   401   sign in required
+  PASS  GET /api/zapia/status                   anonymous   401   sign in required
+  PASS  GET /api/zapia/candidates               anonymous   401   sign in required
+  PASS  GET /api/social/status                  anonymous   401   sign in required
+  PASS  POST /api/social/connect                anonymous   401   sign in required
+  PASS  POST /api/social/test                   anonymous   401   sign in required
+  PASS  POST /api/v1/campaigns                  anonymous   401   sign in required
+  PASS  POST /api/v1/campaign-owners            anonymous   401   sign in required
+  PASS  GET /api/v1/campaign-owner              anonymous   401   sign in required
+  PASS  GET /api/v1/business/campaigns          anonymous   401   sign in required
+  PASS  POST /api/v1/kyc/basic                  anonymous   401   sign in required
+  PASS  POST /api/v1/kyc/identity               anonymous   401   sign in required
+  PASS  GET /api/v1/kyc/payout-account          anonymous   401   sign in required
+  PASS  POST /api/v1/kyc/payout-account         anonymous   401   sign in required
+  PASS  GET /api/v1/promoter/earnings           anonymous   401   sign in required
+  PASS  GET /api/v1/promoter/referrals          anonymous   401   sign in required
+  PASS  GET /api/v1/promoter/payouts            anonymous   401   sign in required
+  PASS  GET /api/v1/checkin                     anonymous   401   sign in required
+  PASS  POST /api/v1/checkin                    anonymous   401   sign in required
+  PASS  GET /api/v1/promotion/cards             anonymous   401   sign in required
+  PASS  POST /api/v1/promotion/cards            anonymous   401   sign in required
+  PASS  GET /api/v1/promotion/cards/mine        anonymous   401   sign in required
+  PASS  GET /api/v1/promotion/pairs             anonymous   401   sign in required
+  PASS  POST /api/v1/promotion/pairs            anonymous   401   sign in required
+  PASS  GET /api/admin/stats                    anonymous   401   sign in required
+  PASS  GET /api/admin/users                    anonymous   401   sign in required
+  PASS  GET /api/admin/tasks                    anonymous   401   sign in required
+  PASS  GET /api/admin/campaigns                anonymous   401   sign in required
+  PASS  POST /api/admin/campaigns               anonymous   401   sign in required
+  PASS  GET /api/admin/campaign/owners          anonymous   401   sign in required
+  PASS  GET /api/admin/kyc                      anonymous   401   sign in required
+  PASS  GET /api/admin/plugins                  anonymous   401   sign in required
+  PASS  GET /api/admin/settings                 anonymous   401   sign in required
+  PASS  POST /api/admin/settings                anonymous   401   sign in required
+  PASS  GET /api/admin/audit                    anonymous   401   sign in required
+  PASS  GET /api/v1/admin/promotion/cards       anonymous   401   sign in required
+  PASS  GET /api/v1/admin/promotion/deliveries  anonymous   401   sign in required
+  PASS  POST /api/v1/admin/promotion/expire     anonymous   401   sign in required
+
+  52 PASS   1 FAIL   0 SKIP
+  ROUTE AUDIT: FAIL
+
+Interpretation: exit 1 is caused solely by the OTP route 502 (Termii country
+inactive — GAP-2, owner-side SMS account action). All seven routes that returned
+HTTP 500 before the flip (tasks/mine, policy, promotion cards, cards/mine, pairs,
+admin promotion cards, admin promotion deliveries) are now the correct 401.

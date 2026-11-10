@@ -1,0 +1,12 @@
+2026-11-09. Values never printed; the script prints key names only.
+
+PS> node scripts/deploy-hostinger.mjs env
+env applied: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, SESSION_SECRET, PAYOUT_ENCRYPTION_KEY, FLUTTERWAVE_PUBLIC_KEY, FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_ENCRYPTION_KEY, FLUTTERWAVE_WEBHOOK_SECRET, FLUTTERWAVE_BASE_URL, TERMII_API_KEY, TERMII_BASE_URL, TERMII_SENDER_ID, TWENTY5_API_KEY, TWENTY5_BASE_URL, TWENTY5_SPEC_URL, TWENTY5_PUBLIC_KEY, VTU_BASE_URL, VTU_AUTH_URL, VTU_USERNAME, VTU_PASSWORD, VTU_USER_PIN, TRUST_PROXY_HOPS
+
+Notes:
+- The SUPABASE_* values pushed came from the local .env patched to zaew (backup .env.bak-ykyv-* kept).
+- BULKSMS_* keys absent: no token exists yet (GAP-2). SMS_PROVIDER absent: facade default applies.
+- SUPABASE_SERVICE_ROLE_KEY absent from .env; SUPABASE_SECRET_KEY satisfies the alternate-slot check.
+
+PS> node scripts/deploy-hostinger.mjs restart
+restart requested

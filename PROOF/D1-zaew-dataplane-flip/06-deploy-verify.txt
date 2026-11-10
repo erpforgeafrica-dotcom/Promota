@@ -1,0 +1,31 @@
+PS> node scripts/verifyLive.mjs https://promota.click
+Live deploy verification against https://promota.click
+
+  PASS  home page returns 200 HTML
+  PASS  page is the Promota pilot
+  PASS  no unbuilt config.example reference shipped
+  PASS  content-security-policy present
+  PASS  nosniff + frame-deny set
+  PASS  /healthz served
+  PASS  /styles.css served
+  PASS  /theme-boot.js served
+  PASS  /assets/identity/favicon.svg served
+  PASS  healthz reports config configured
+  PASS  /config.js served as javascript
+  PASS  /config.js carries a Supabase URL
+  PASS  /config.js carries only a publishable key
+  PASS  deployed config matches this project
+
+Test number 0802****28
+  PASS  visitor can submit a sign-up through the deployed config
+  PASS  response has an 8-char invite code and no phone
+  PASS  visitor cannot read the sign-up list
+  PASS  admin confirms the row really landed in the database
+  PASS  test row cleaned up
+
+  PASS 19   FAIL 0
+  DEPLOY VERIFY: ALL HOLD
+
+"deployed config matches this project" is the flip proof: the runtime /config.js
+served by promota.click now carries the zaew URL + publishable key, and a real
+visitor sign-up landed in zaew and was cleaned up.

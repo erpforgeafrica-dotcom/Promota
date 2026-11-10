@@ -1,0 +1,7 @@
+Post-flip, 2026-11-09.
+
+GET https://promota.click/healthz
+-> HTTP 200: {"ok":true,"config":true,"auth":true,"providers":{"supabase":true,"sms":true,"smsProvider":"termii","termii":true,"flutterwave":true,"sessions":true,"data":{"ready":true,"provider":"twenty5","detail":[{"provider":"twenty5","ready":true,"reason":null},{"provider":"vtung","ready":true,"reason":null}],"unknown":[]}}}
+
+Shape is the frozen one ({ ok, config, auth, providers }); the deployed artifact is the
+expected code. SMS provider remains termii (no BULKSMS_API_TOKEN yet — GAP-2, owner-side).

@@ -1,6 +1,7 @@
 # STATUS.md — verified state of the Promota repo
 
-**Date:** 2026-10-07. **Rule:** nothing below is claimed without a passing check. Items that
+**Date:** 2026-11-09 (production data-plane flip update; earlier sections keep their original dates).
+**Rule:** nothing below is claimed without a passing check. Items that
 cannot be proven here are marked UNVERIFIED with their proof venue, never passed.
 
 ## Where this code comes from
@@ -30,6 +31,12 @@ Proof bundles: `PROOF/C1-lead-backend-live/` and `PROOF/C2-live-api-proof/` (man
 raw command output + artifact hashes), plus `PROOF/C3-railway-live/` for the deployment.
 
 ## Live Supabase project (connected and proven over HTTPS)
+
+> **2026-11-09:** this section records the 2026-10 C-phase proofs against
+> `ykyvmgdruterzrmltquz`. Production has since been flipped to
+> `zaewhjzdoyaxsfjjxwqd` — see "Production data-plane flip" below. The
+> C-phase proofs remain valid as history; the current live state is the
+> flip section.
 
 - Project `ykyvmgdruterzrmltquz`; credentials authenticate (`node scripts/dbProbe.mjs`).
 - **All seven migrations `0001`–`0007` are applied live** (recorded in the ledger).
@@ -94,11 +101,13 @@ raw command output + artifact hashes), plus `PROOF/C3-railway-live/` for the dep
 5. `BULKSMS_API_TOKEN` for the SMS/OTP path (the provider switched to BulkSMS
    Nigeria on 2026-11-09). Termii's key stays only for carrier lookup and as an
    env-selectable fallback.
-6. Reset the live Postgres password (Supabase dashboard → Project Settings →
-   Database → Reset database password). The password in
-   `C:\Users\pc\sabisupabase.txt.txt` returns `28P01` on both pooler ports, so
-   `npm run db:remote` cannot apply `0018`–`0020` and the promotion routes stay
-   at HTTP 500 until it does.
+6. ~~Reset the live Postgres password so `npm run db:remote` can apply `0018`–`0020`.~~
+   **RESOLVED 2026-11-09, differently:** production was flipped to Supabase project
+   `zaewhjzdoyaxsfjjxwqd`, which carries migrations `0001`–`0020` (applied through the
+   Management API with the owner-supplied PAT; ledger 20/20 with repo-canonical checksums).
+   `/readyz` now reports `migrations {repo:20, applied:20}` and the promotion routes answer
+   401 instead of 500. Evidence: `PROOF/D1-zaew-dataplane-flip/`. No DB password is needed
+   by the runtime (PostgREST) or by future DDL (Management API path).
 
 ## Identity export verification
 
@@ -120,7 +129,7 @@ the API (`api/business.mjs`, `api/routes.mjs`) and both consoles.
 | Policy gate holds locally | `node db/policy.test.mjs` � 35 PASS / 0 FAIL |
 | Existing suites still hold | `npm test` chain � ledger 56/0, leads 41/0, points 59/0, redemption 13/0, views 17/0, api 90/0, providers 34/0 + 21/0, phone 17/0, lead 24/0, image 7/0 |
 | Site integrity | `node scripts/checkSite.mjs` � 187 PASS / 0 FAIL (the 3 `?next=` false positives are fixed) |
-| Live Supabase | **NOT APPLIED** — repo ships 20 migrations (`0001`–`0020`), live ledger max was 17 at the last probe. `predeploy-check` is NO-GO until `npm run db:remote` runs with owner approval. |
+| Live Supabase | **APPLIED 2026-11-09** — production project `zaewhjzdoyaxsfjjxwqd` carries `0001`–`0020` (ledger 20/20); `/readyz` = `ready:true, migrations {repo:20, applied:20}`. Was NOT APPLIED on `ykyvmgdruterzrmltquz` (ledger max 17) — that is why the flip happened. |
 | Hostinger | **REDEPLOYED 2026-11-04** — builds on `b8e41a5` completed; `/`, `/healthz` and `/admin.html` return 200 and an owner session verifies against `/api/me` and `/api/admin/stats`. |
 
 **Verdict:** the policy risk is closed in code. The live database and the Hostinger
@@ -144,8 +153,8 @@ value.
 | Full gate | `npm test` — EXIT 0 (ledger 56/0, leads 41/0, points 59/0, policy 39/0, redemption 13/0, views 17/0, mutual promotion 56/0, api 110/0, image 7/0, providers 34/0 + 21/0) |
 | Site integrity | `npm run site` — 187 PASS / 0 FAIL |
 | Product and rules | `docs/PROMOTION-MUTUAL.md` |
-| Live Supabase | **NOT APPLIED** — `0019`/`0020` are not on the live database; `npm run db:remote` needs the live Postgres password (owner action) |
-| Deployment | **DEPLOYED, but the promotion routes 500 until the DB catches up** — `/api/v1/promotion/cards` and `/api/v1/promotion/pairs` return HTTP 500 `internal error` on the live 17-migration database |
+| Live Supabase | **APPLIED 2026-11-09** — `0019`/`0020` are live on the production project `zaewhjzdoyaxsfjjxwqd` (applied via the Management API bundle + ledger fix, not `npm run db:remote` which needs a DB password) |
+| Deployment | **HEALTHY 2026-11-09** — promota.click flipped to `zaewhjzdoyaxsfjjxwqd`; the promotion routes now return 401 `sign in required` for anonymous callers instead of HTTP 500 (route audit 52 PASS / 1 FAIL, the one FAIL being the OTP/Termii blocker) |
 
 The two UNVERIFIED cases are RLS proofs that need real JWTs (anonymous read of
 another member's pair, and browser write denial); their venue is
@@ -194,6 +203,9 @@ matches the Supabase URL in `.env`, carries no service key), `/healthz`,
 `/dashboard.html` (promote-you tab present), `/admin.html` (promotions pane
 present) and five assets all 200. The one failure is `/readyz` 503 —
 `{"repo":20,"applied":17}`, the migration gap above, not a deploy fault.
+*(Resolved 2026-11-09 by the data-plane flip below: `/readyz` is now 200 with
+`applied:20`; the OTP route remains the one open failure — Termii country
+inactive, owner action.)*
 
 Known limitation, stated not hidden: failed-attempt counting is
 in-process (max 5). Exact for the single-process deploy; a restart clears it and
@@ -257,4 +269,38 @@ number.
   A-1..A-7 in `docs/ENHANCEMENT-PLAN-20261103.md` §3, with the scope note that
   challenge/competition prize pools are FIXED per event and 60/40 applies to
   promoting content generated from a competition. No decision now blocks
-  Phase 1; only the deployment unblock (#DB password or SQL bundle) remains.
+  Phase 1; ~~only the deployment unblock (#DB password or SQL bundle) remains~~
+  **the deployment unblock closed 2026-11-09** (data-plane flip below); the
+  remaining launch blocker is the SMS/OTP provider account (GAP-2).
+
+## Production data-plane flip: ykyv → zaew (2026-11-09)
+
+The repo ships 20 migrations; the previous production project
+(`ykyvmgdruterzrmltquz`) sat at 17, so seven routes returned HTTP 500 and
+`/readyz` answered 503. The owner supplied a Supabase PAT for the
+`zaewhjzdoyaxsfjjxwqd` account (label `ENGROPENCODEPROMOTA` in
+`Documents\OPENCODE KEYS.rtf`) and approved the flip in chat. Migrations
+`0001`–`0020` were applied to zaew through the Management API (idempotent
+bundle, each migration its own transaction; ledger corrected to 20 true rows
+with repo-canonical checksums after the generator's `filename='undefined'` bug
+was found), `predeploy-check` passed GO 4/4 for the first time, and the
+production env was pushed and restarted.
+
+| Claim | Evidence |
+|---|---|
+| zaew carries the full schema | 36 public tables, 27 RLS-enabled, ledger 20/20 (`0001_core.sql` … `0020_mutual_promotion.sql`); 0018 checksum `f0d2e06663a91f5c` cross-matches the independent 0018–0020 bundle |
+| Local gate green before the flip | `node scripts/predeploy-check.js` — GO 4/4 (migration parity repo 20 / database 20); `npm test` EXIT 0 (19 suites, 0 FAIL); `npm run site` 187 PASS / 0 FAIL |
+| Env pushed, no values printed | `node scripts/deploy-hostinger.mjs env` — `env applied:` CORE list (names only); then `restart` |
+| Production is ready | `/readyz` → **HTTP 200 `{ready:true, checks:{supabase:{ok},flags:{ok},migrations:{ok,repo:20,applied:20}}}`** (was 503) |
+| The seven 500 routes are closed | `node scripts/audit-live.mjs https://promota.click` — **52 PASS / 1 FAIL**; tasks/mine, policy, promotion cards, cards/mine, pairs, admin promotion cards/deliveries all 401 now; the single FAIL is `POST /api/auth/otp/request` 502 `termii: Country Inactive` (GAP-2, unchanged by this flip) |
+| A real user path works on the new data plane | `node scripts/verifyLive.mjs https://promota.click` — **19 PASS / 0 FAIL**, "deployed config matches this project"; a real visitor sign-up landed in zaew and was cleaned up |
+| Sessions are flip-proof | `api/session.mjs` verifies its own HMAC-SHA256 tokens keyed by `SESSION_SECRET` (unchanged) — no Supabase JWKS dependency |
+| Rollback exists | `.env.bak-ykyv-*` locally; ykyv project untouched |
+
+Proof bundle: `PROOF/D1-zaew-dataplane-flip/`.
+
+**Remaining launch blocker (owner-side):** the SMS/OTP account. Termii has the
+Nigeria country inactive and no approved sender id, so `POST /api/auth/otp/request`
+returns 502 and phone sign-in — the only login path — cannot issue codes.
+Fix: activate Termii Nigeria + sender, or supply `BULKSMS_API_TOKEN` (the
+BulkSMS switch is shipped; `deploy-hostinger.mjs env` already carries its keys).

@@ -1,0 +1,10 @@
+Pre-flip snapshot, 2026-11-09 (before env push / restart). promota.click still on ykyv.
+
+Invoke-WebRequest -Uri "https://promota.click/readyz" -UseBasicParsing
+-> EXCEPTION: The remote server returned an error: (503) Server Unavailable.
+
+Invoke-WebRequest -Uri "https://promota.click/healthz" -UseBasicParsing
+-> HTTP 200: {"ok":true,"config":true,"auth":true,"providers":{"supabase":true,"sms":true,"smsProvider":"termii","termii":true,"flutterwave":true,"sessions":true,"data":{"ready":true,"provider":"twenty5","detail":[{"provider":"twenty5","ready":true,"reason":null},{"provider":"vtung","ready":true,"reason":null}],"unknown":[]}}}
+
+Interpretation: the server is healthy but NOT ready — the migration gap
+(repo 20 vs applied 17 on ykyv) is the documented 503 cause (readyz gate working as designed).
