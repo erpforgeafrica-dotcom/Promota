@@ -94,6 +94,7 @@ Other commands that matter:
 | `node scripts/checkImage.mjs` | The Docker image ships everything `server.mjs` imports |
 | `node scripts/verifyLive.mjs <url>` | The deployed site actually works end to end |
 | `node scripts/predeploy-check.js` | Deploy gate: env names, migration parity, CSP snapshot |
+| `node scripts/proof-bulksms.mjs` | Live BulkSMS proof against the **sandbox** (no real SMS, zero cost): balance, a send, an OTP round trip. Needs `BULKSMS_API_TOKEN`; `BULKSMS_SANDBOX=0` opts into production. |
 
 `api/server.smoke.mjs` and `providers/providers.smoke.mjs` need live provider
 credentials and are deliberately **not** in `npm test` so CI stays offline and
