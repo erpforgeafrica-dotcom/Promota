@@ -20,7 +20,10 @@
  * dropped. Nothing is marked delivered that was not actually delivered.
  */
 import * as sb from '../api/supabase.mjs';
-import * as termii from '../providers/termii.mjs';
+// Notifications go through the same switch as sign-in, so switching the SMS
+// provider is one env change for the whole platform — never a partial switch
+// where OTP uses BulkSMS while the outbox still bills Termii.
+import * as sms from '../providers/sms.mjs';
 import * as data from '../providers/data.mjs';
 import * as flw from '../providers/flutterwave.mjs';
 import * as payouts from '../api/payouts.mjs';
@@ -215,7 +218,7 @@ async function notifyProfile(profileId, message) {
   const rows = await sb.select('profiles', `id=eq.${profileId}&select=phone_e164`);
   const phone = rows?.[0]?.phone_e164;
   if (!phone) return { delivered: true, note: 'no phone on file' };
-  await termii.sendSms({ to: phone, message });
+  await sms.sendSms({ to: phone, message });
   return { delivered: true };
 }
 
@@ -241,7 +244,7 @@ const handlers = {
     const profile = await sb.select('profiles', `id=eq.${p.profile_id}&select=phone_e164`);
     const phone = profile?.[0]?.phone_e164;
     if (!phone) return { delivered: true, note: 'no phone on file' };
-    await termii.sendSms({
+    await sms.sendSms({
       to: phone,
       message: `Promota: ${p.points} points added for a completed task. Balance is now updated.`,
     });
@@ -253,7 +256,7 @@ const handlers = {
     const profile = await sb.select('profiles', `id=eq.${p.referrer_id}&select=phone_e164`);
     const phone = profile?.[0]?.phone_e164;
     if (!phone) return { delivered: true, note: 'no phone on file' };
-    await termii.sendSms({
+    await sms.sendSms({
       to: phone,
       message: `Promota: ${p.points} referral points added. Thanks for inviting someone.`,
     });
@@ -367,7 +370,7 @@ const handlers = {
     const rows = await sb.select('profiles', `id=eq.${p.referrer_id}&select=phone_e164`);
     const phone = rows?.[0]?.phone_e164;
     if (!phone) return { delivered: true, note: 'no phone on file' };
-    await termii.sendSms({
+    await sms.sendSms({
       to: phone,
       message: `Promota: your referral earned you ${p.points} points for a completed task. Keep them going.`,
     });

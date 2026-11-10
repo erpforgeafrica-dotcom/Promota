@@ -103,7 +103,13 @@ deterministic.
 ## SMS / OTP provider (read before touching sign-in)
 
 Sign-in is phone OTP, so this path is launch-critical. It goes through
-`providers/sms.mjs`, never a vendor adapter directly.
+`providers/sms.mjs`, never a vendor adapter directly. That is not a convention:
+`providers/sms.test.mjs` scans `api/`, `providers/`, `scripts/` and the repo root
+and fails the build when any module imports `termii.mjs` or `bulksms.mjs`
+directly (the facade, the two adapters, the per-vendor smoke/proof scripts and
+the `*.test.mjs` files are exempt by design). It caught a real bypass once —
+`api/worker.mjs` sent its notification SMS through Termii, so a provider switch
+would have been half-applied.
 
 | Env | Meaning |
 |---|---|

@@ -11,7 +11,6 @@
  */
 import * as sb from './supabase.mjs';
 import * as session from './session.mjs';
-import * as termii from '../providers/termii.mjs';
 import * as sms from '../providers/sms.mjs';
 import * as flw from '../providers/flutterwave.mjs';
 import * as data from '../providers/data.mjs';
@@ -584,7 +583,7 @@ export async function health() {
     // the report because it is still the carrier-lookup adapter.
     sms: sms.configured(),
     smsProvider: sms.provider(),
-    termii: termii.configured(),
+    termii: sms.vendors().termii,
     flutterwave: flw.configured(),
     sessions: session.configured(),
     data: data.status(),

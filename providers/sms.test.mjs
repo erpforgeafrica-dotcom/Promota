@@ -13,6 +13,9 @@
  */
 import * as sms from './sms.mjs';
 import * as bulksms from './bulksms.mjs';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 let pass = 0, fail = 0;
 function check(label, ok, detail) {
@@ -158,6 +161,51 @@ async function caseNoLeak() {
   envReset();
 }
 
+/* -------------------------------- case: nobody bypasses the switch (static gate) */
+/**
+ * The whole point of this module is that a provider swap is ONE env change.
+ * That promise is only true while nothing imports a vendor adapter directly,
+ * so the invariant is checked here rather than trusted to review.
+ *
+ * Found this way for real: `api/worker.mjs` still sent notification SMS through
+ * `termii.sendSms`, so switching to BulkSMS would have moved sign-in while the
+ * outbox kept billing the old vendor.
+ *
+ * Exempt by design: the facade itself; the two adapters; the per-vendor live
+ * smoke/proof scripts whose entire purpose is to exercise ONE vendor's
+ * contract; and the `*.test.mjs` files that necessarily test each adapter in
+ * isolation.
+ */
+function caseNoDirectVendorImports() {
+  const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const SCAN_DIRS = ['api', 'providers', 'scripts', '.'];
+  const VENDOR_IMPORT = /from\s+['"][^'"]*\/(?:termii|bulksms)\.mjs['"]/;
+  const EXEMPT = new Set([
+    'providers/sms.mjs', 'providers/termii.mjs', 'providers/bulksms.mjs',
+    'providers/providers.smoke.mjs', 'scripts/proof-bulksms.mjs',
+  ]);
+
+  const offenders = [];
+  let scanned = 0;
+  for (const dir of SCAN_DIRS) {
+    const abs = path.join(ROOT, dir);
+    let entries = [];
+    try { entries = readdirSync(abs, { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isFile() || !e.name.endsWith('.mjs')) continue;
+      const rel = (dir === '.' ? e.name : `${dir}/${e.name}`).replace(/\\/g, '/');
+      if (EXEMPT.has(rel) || rel.endsWith('.test.mjs')) continue;
+      scanned++;
+      const src = readFileSync(path.join(abs, e.name), 'utf8');
+      if (VENDOR_IMPORT.test(src)) offenders.push(rel);
+    }
+  }
+
+  check('the vendor-import scan actually looked at source files', scanned > 10, `scanned ${scanned}`);
+  check('no module imports a vendor SMS adapter directly (everything goes through sms.mjs)',
+    offenders.length === 0, offenders.join(', '));
+}
+
 (async () => {
   try {
     caseNone();
@@ -166,6 +214,7 @@ async function caseNoLeak() {
     await caseOtpContract();
     await caseLookup();
     await caseNoLeak();
+    caseNoDirectVendorImports();
   } catch (e) {
     fail++;
     console.error('  FAIL  unhandled in test runner', String(e && e.stack || e).split('\n')[0]);

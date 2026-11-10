@@ -16,7 +16,6 @@
  */
 import * as session from './session.mjs';
 import * as sb from './supabase.mjs';
-import * as termii from '../providers/termii.mjs';
 import * as sms from '../providers/sms.mjs';
 import * as data from '../providers/data.mjs';
 import * as flw from '../providers/flutterwave.mjs';

@@ -41,6 +41,17 @@ export function configured() {
   return false;
 }
 
+/**
+ * Per-vendor credential presence, for `/healthz`.
+ *
+ * Exists so the route table can report "is Termii configured?" without
+ * importing a vendor adapter — that import is exactly how the switch stops
+ * being universal, and `providers/sms.test.mjs` fails the build if one appears.
+ */
+export function vendors() {
+  return { bulksms: bulksms.configured(), termii: termii.configured() };
+}
+
 function impl() {
   const p = provider();
   if (p === 'bulksms') return bulksms;
