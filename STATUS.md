@@ -177,11 +177,23 @@ payload (nonce + expiry), the recipient and the pin, keyed by `OTP_SECRET`
 | Health and admin visibility | `/healthz` reports `sms` + `smsProvider` alongside `termii`; `/api/admin/plugins` labels the balance row with the live provider (keeps the `termiiBalance` key the page reads) |
 | Full gate | `npm test` — EXIT 0 (phone 17/0, lead 24/0, auth 12/0, api 129/0, image 7/0, ledger 56/0, leads 41/0, points 59/0, policy 39/0, redemption 13/0, views 17/0, mutual promotion 56/0, termii 56/0, bulksms 101/0, sms 25/0, dataManager 34/0, payoutCrypto 21/0, ui-wiring 5/0, dom 2/0); `npm run site` 187 PASS / 0 FAIL; `node scripts/checkImage.mjs` 7 PASS / 0 FAIL |
 
-**Live status: UNVERIFIED against the real gateway.** No `BULKSMS_API_TOKEN`
-exists on this machine (`.env` holds only `TERMII_*`), so the sandbox proof —
-balance, a simulated send, and a full OTP request/verify — has not been run.
-Termii remains configured as the fallback, so sign-in keeps working until the
-token is supplied and `SMS_PROVIDER`/the token flips the switch.
+**Live status: code deployed, gateway UNVERIFIED.** Hostinger (`promota.click`)
+auto-builds every push to `main`: build `01a1c41a-49de-728f-b4d3-17016308870f`
+is `completed` for commit `f500c32` (2026-11-10T06:16:59Z), and the live
+`/healthz` returns 200 with `"sms":true,"smsProvider":"termii"`. So the switch
+code is live; the provider is still Termii because no `BULKSMS_API_TOKEN` exists
+on this machine (`.env` holds only `TERMII_*`), and the Hostinger build env
+carries the same Termii-only key set. That is the safe direction to be wrong in:
+sign-in keeps working. The sandbox proof — balance, a simulated send, a full OTP
+request/verify — has not been run and stays `UNVERIFIED` until the token exists.
+Once it does: `node scripts/deploy-hostinger.mjs env` pushes the BulkSMS keys
+(the `CORE` list now includes them) and `SMS_PROVIDER`/the token flips the switch.
+
+Live read-only check (`17 PASS / 1 FAIL`): `/`, `/config.js` (runtime config
+matches the Supabase URL in `.env`, carries no service key), `/healthz`,
+`/dashboard.html` (promote-you tab present), `/admin.html` (promotions pane
+present) and five assets all 200. The one failure is `/readyz` 503 —
+`{"repo":20,"applied":17}`, the migration gap above, not a deploy fault.
 
 Known limitation, stated not hidden: failed-attempt counting is
 in-process (max 5). Exact for the single-process deploy; a restart clears it and
