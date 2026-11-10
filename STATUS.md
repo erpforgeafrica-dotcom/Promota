@@ -91,7 +91,9 @@ raw command output + artifact hashes), plus `PROOF/C3-railway-live/` for the dep
    `m1ckad0's Projects` after the `sabistack.acad` trial hit its provision cap. Live URL verified
    (`PROOF/C3-railway-live/`).
 4. Registered entity name/jurisdiction + PII-storage decision.
-5. Termii API key for the SMS double opt-in worker.
+5. `BULKSMS_API_TOKEN` for the SMS/OTP path (the provider switched to BulkSMS
+   Nigeria on 2026-11-09). Termii's key stays only for carrier lookup and as an
+   env-selectable fallback.
 6. Reset the live Postgres password (Supabase dashboard → Project Settings →
    Database → Reset database password). The password in
    `C:\Users\pc\sabisupabase.txt.txt` returns `28P01` on both pooler ports, so
@@ -151,6 +153,38 @@ another member's pair, and browser write denial); their venue is
 
 **Verdict:** the feature is complete in `main` and proven locally. Live remains
 owner-blocked on the database password.
+
+## SMS/OTP provider switch: Termii → BulkSMS Nigeria (2026-11-09)
+
+Owner order: "USE BULKSMSNIGERIA INSTEAD". Sign-in is phone OTP and it is the
+only login path, so this is a launch-critical swap, not a provider preference.
+
+BulkSMS Nigeria publishes `POST /sms` and `GET /balance` (plus delivery reports,
+transactions and sender ids). It publishes **no verify endpoint**, so the OTP
+check moved server-side: `pinId` is an HMAC-SHA256 challenge over the encoded
+payload (nonce + expiry), the recipient and the pin, keyed by `OTP_SECRET`
+(falling back to `SESSION_SECRET`). No migration is involved.
+
+| Claim | Evidence |
+|---|---|
+| The transport contract is pinned | `node providers/bulksms.test.mjs` — 101 PASS / 0 FAIL (Bearer header, prod vs sandbox base, digits-only + multi-recipient, local `0803…` → `234803…`, 11-char sender cap, `status:"error"` on a 200 fails, non-JSON body, token never in a message) |
+| The OTP challenge resists attack | same suite: wrong pin, tampered signature, edited payload, correctly-signed-but-expired token, token replayed against another number, rotated secret, 5-miss lock |
+| The expiry is actually signed | found by that suite: the MAC originally covered only `nonce.recipient.pin`, so an edited `e` kept a valid signature. Fixed — the MAC now covers the encoded payload |
+| Provider selection is one switch | `node providers/sms.test.mjs` — 23 PASS / 0 FAIL (`SMS_PROVIDER` explicit → credential auto-detect → loud refusal; a forced provider with no credential reads as unconfigured so the route answers 503, not a 502 blaming the gateway) |
+| Sign-in still completes end to end | `node api/api.test.mjs` — 129 PASS / 0 FAIL, including a real `requestOtp` → read the code out of the stubbed SMS body → `verifyOtp` round trip on the sandbox base, plus a wrong-code 400 and a cross-number refusal |
+| Health and admin visibility | `/healthz` reports `sms` + `smsProvider` alongside `termii`; `/api/admin/plugins` labels the balance row with the live provider (keeps the `termiiBalance` key the page reads) |
+| Full gate | `npm test` EXIT 0; `npm run site` 187 PASS / 0 FAIL |
+
+**Live status: UNVERIFIED against the real gateway.** No `BULKSMS_API_TOKEN`
+exists on this machine (`.env` holds only `TERMII_*`), so the sandbox proof —
+balance, a simulated send, and a full OTP request/verify — has not been run.
+Termii remains configured as the fallback, so sign-in keeps working until the
+token is supplied and `SMS_PROVIDER`/the token flips the switch.
+
+Known limitation, stated not hidden: failed-attempt counting is
+in-process (max 5). Exact for the single-process deploy; a restart clears it and
+it is not shared between instances. A table is the fix if Promota is ever run
+multi-instance.
 
 ## UI wiring gates (2026-11-09)
 

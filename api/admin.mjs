@@ -17,6 +17,7 @@
 import * as session from './session.mjs';
 import * as sb from './supabase.mjs';
 import * as termii from '../providers/termii.mjs';
+import * as sms from '../providers/sms.mjs';
 import * as data from '../providers/data.mjs';
 import * as flw from '../providers/flutterwave.mjs';
 import * as social from './social.mjs';
@@ -1077,23 +1078,28 @@ export async function taskProofs(req, params) {
 
 /**
  * GET /api/admin/plugins � REAL plugin inventory: live probes per provider,
- * config presence, and termii balance. No staged "all green" answer.
+ * config presence, and the live SMS balance. No staged "all green" answer.
  */
 export async function pluginsProbe(req) {
   const gate = await requireAdmin(req, ['admin', 'owner', 'support']);
   if (gate.error) return gate.error;
 
+  // The OTP path is whichever adapter providers/sms.mjs selects right now;
+  // naming it in the probe stops an operator from reading a BulkSMS balance as
+  // if it were Termii's (or the reverse).
+  const smsProvider = sms.provider();
+
   const plugins = [
     { name: 'supabase', status: sb.configured() ? 'operational' : 'unconfigured', note: 'ledger + auth data' },
-    { name: 'termii-sms', status: termii.configured() ? 'operational' : 'unconfigured', note: 'OTP + promoter SMS' },
+    { name: `sms-${smsProvider}`, status: sms.configured() ? 'operational' : 'unconfigured', note: 'OTP + promoter SMS' },
     { name: 'flutterwave-cash', status: flw.configured() ? 'operational' : 'unconfigured', note: 'cash payouts + webhook' },
     { name: 'data-aggregator', status: data.status().ready ? 'operational' : 'unconfigured', note: 'data bundle fulfilment' },
     { name: 'sessions', status: session.configured() ? 'operational' : 'unconfigured', note: 'HMAC phone sessions' },
   ];
 
   let balance = null;
-  if (termii.configured()) {
-    try { balance = await termii.balance(); }
+  if (sms.configured()) {
+    try { balance = await sms.balance(); }
     catch (e) { plugins[1].status = 'degraded'; plugins[1].note = `probe failed: ${String(e.message).slice(0, 80)}`; }
   }
 
@@ -1102,7 +1108,11 @@ export async function pluginsProbe(req) {
   return ok({
     checkedAt: new Date().toISOString(),
     plugins,
+    // `termiiBalance` is kept because apps/web/admin.js already renders it; it
+    // now carries the balance of the live SMS provider. `smsProvider` says
+    // which one that is so the figure cannot be misread.
     termiiBalance: balance,
+    smsProvider,
     socials,
   });
 }

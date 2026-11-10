@@ -53,15 +53,22 @@ const REQUIRED_ENV = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'FLUTTERWAVE_SECRET_KEY',
-  'TERMII_API_KEY',
   'SESSION_SECRET',
 ];
+/* Sign-in is phone OTP, so ONE SMS credential must exist. Which vendor it
+ * belongs to is a deployment choice (BulkSMS is the default, Termii the
+ * fallback and the carrier-lookup adapter), so this is an either/or. */
+const SMS_CREDENTIALS = ['BULKSMS_API_TOKEN', 'TERMII_API_KEY'];
 
 loadDotEnv();
 {
   const missing = REQUIRED_ENV.filter((n) => !String(process.env[n] || '').trim());
   if (missing.length === 0) ok(`required env names present (${REQUIRED_ENV.length}/${REQUIRED_ENV.length})`);
   else bad('required env names present', `missing: ${missing.join(', ')}`);
+
+  const sms = SMS_CREDENTIALS.filter((n) => String(process.env[n] || '').trim());
+  if (sms.length) ok(`SMS credential present (${sms.join(' + ')})`);
+  else bad('SMS credential present', `missing: one of ${SMS_CREDENTIALS.join(', ')}`);
 }
 
 /* ------------------------------------------------- (b) migration parity */

@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node apps/web/phone.test.mjs && node apps/web/lead.test.mjs && node apps/web/auth.test.mjs && node api/api.test.mjs && node scripts/checkImage.mjs && node db/ledger.test.mjs && node db/leads.test.mjs && node db/points.test.mjs && node db/policy.test.mjs && node db/redemption-integrity.test.mjs && node db/views-evidence.test.mjs && node db/mutual-promotion.test.mjs && node providers/termii.test.mjs && node providers/dataManager.test.mjs && node providers/payoutCrypto.test.mjs && node scripts/audit-ui-wiring.mjs && node scripts/checkDomContract.mjs",
+    "test": "node apps/web/phone.test.mjs && node apps/web/lead.test.mjs && node apps/web/auth.test.mjs && node api/api.test.mjs && node scripts/checkImage.mjs && node db/ledger.test.mjs && node db/leads.test.mjs && node db/points.test.mjs && node db/policy.test.mjs && node db/redemption-integrity.test.mjs && node db/views-evidence.test.mjs && node db/mutual-promotion.test.mjs && node providers/termii.test.mjs && node providers/bulksms.test.mjs && node providers/sms.test.mjs && node providers/dataManager.test.mjs && node providers/payoutCrypto.test.mjs && node scripts/audit-ui-wiring.mjs && node scripts/checkDomContract.mjs",
     "audit:ui": "node scripts/audit-ui-wiring.mjs",
     "audit:dom": "node scripts/checkDomContract.mjs",
     "site": "node scripts/checkSite.mjs",

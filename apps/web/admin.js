@@ -790,7 +790,10 @@
           return '<tr><td>' + esc(p.name) + '</td><td>' + badge(p.status) + '</td><td class="fine">' + esc(p.note || '–') + '</td></tr>';
         }).join('');
         if (r.body.termiiBalance != null) {
-          body.innerHTML += '<tr><td>termii-balance</td><td>' + badge('live read') + '</td><td class="fine">' +
+          // The key name is historical (admin.html shipped with it); the row is
+          // labelled with the live provider so a BulkSMS balance is never read
+          // as a Termii one.
+          body.innerHTML += '<tr><td>' + esc(r.body.smsProvider || 'sms') + '-balance</td><td>' + badge('live read') + '</td><td class="fine">' +
             esc(JSON.stringify(r.body.termiiBalance).slice(0, 120)) + '</td></tr>';
         }
       }

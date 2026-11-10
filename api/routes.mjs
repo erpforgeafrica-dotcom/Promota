@@ -12,6 +12,7 @@
 import * as sb from './supabase.mjs';
 import * as session from './session.mjs';
 import * as termii from '../providers/termii.mjs';
+import * as sms from '../providers/sms.mjs';
 import * as flw from '../providers/flutterwave.mjs';
 import * as data from '../providers/data.mjs';
 import * as admin from './admin.mjs';
@@ -60,20 +61,21 @@ export async function requestOtp(req) {
   const phone = normalisePhone(req.body?.phone);
   if (!phone) return fail('a valid Nigerian phone number is required');
 
-  if (!termii.configured()) return fail('SMS provider is not configured', 503);
+  if (!sms.configured()) return fail('SMS provider is not configured', 503);
 
   const pin = session.newOtp();
   const e164 = toE164(phone);
 
   try {
     // Network detection is best-effort: it must never block a signup.
-    const info = await termii.lookupNumber(e164);
-    const { pinId } = await termii.sendOtp({ to: e164, pin });
+    const info = await sms.lookupNumber(e164);
+    const { pinId } = await sms.sendOtp({ to: e164, pin });
 
     // pinId MUST be returned: verifyOtp() cannot be called without it, so
-    // omitting it made the whole OTP login flow impossible. The PIN itself is
-    // NEVER returned or logged — only the id Termii uses to verify it later.
-    return ok({ sent: true, phone: phone, network: info.network, pinId }, 200);
+    // omitting it made the whole OTP login flow impossible. With BulkSMS this
+    // is a signed challenge, not a vendor handle — either way the PIN itself is
+    // NEVER returned or logged.
+    return ok({ sent: true, phone: phone, network: info.network, pinId, provider: sms.provider() }, 200);
   } catch (e) {
     return fail(`could not send the code: ${String(e.message).slice(0, 120)}`, 502);
   }
@@ -88,18 +90,20 @@ export async function verifyOtp(req) {
     return fail('phone, pinId and pin are required');
   }
 
-  if (!termii.configured()) return fail('SMS provider is not configured', 503);
+  if (!sms.configured()) return fail('SMS provider is not configured', 503);
+
+  const e164 = toE164(phone);
 
   let good = false;
-  try { good = await termii.verifyOtp({ pinId, pin }); }
+  // `phone` is passed so a challenge is bound to the number it was sent to.
+  try { good = await sms.verifyOtp({ pinId, pin, to: e164, phone: e164 }); }
   catch (e) { return fail(`verification failed: ${String(e.message).slice(0, 120)}`, 502); }
 
   // A wrong code is a refusal, not an outage, and must not reveal whether the
   // number is already registered.
   if (!good) return fail('that code is not valid', 400);
 
-  const e164 = toE164(phone);
-  const info = await termii.lookupNumber(e164);
+  const info = await sms.lookupNumber(e164);
 
   // find or create the auth.users row + profile
   const existing = await sb.select('profiles', `phone_e164=eq.${e164}&select=id,role,state&limit=1`);
@@ -576,6 +580,10 @@ export async function flutterwaveWebhook(req, rawBody) {
 export async function health() {
   const providers = {
     supabase: sb.configured(),
+    // `sms` is the live OTP/send path (BulkSMS by default); `termii` stays in
+    // the report because it is still the carrier-lookup adapter.
+    sms: sms.configured(),
+    smsProvider: sms.provider(),
     termii: termii.configured(),
     flutterwave: flw.configured(),
     sessions: session.configured(),

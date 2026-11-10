@@ -72,7 +72,8 @@ That is the gate. It runs, in order: `apps/web/phone.test.mjs`,
 `scripts/checkImage.mjs`, `db/ledger.test.mjs`, `db/leads.test.mjs`,
 `db/points.test.mjs`, `db/policy.test.mjs`, `db/redemption-integrity.test.mjs`,
 `db/views-evidence.test.mjs`, `db/mutual-promotion.test.mjs`,
-`providers/termii.test.mjs`, `providers/dataManager.test.mjs`,
+`providers/termii.test.mjs`, `providers/bulksms.test.mjs`,
+`providers/sms.test.mjs`, `providers/dataManager.test.mjs`,
 `providers/payoutCrypto.test.mjs`, `scripts/audit-ui-wiring.mjs`,
 `scripts/checkDomContract.mjs` - the `db/*` suites run on real PostgreSQL
 via PGlite, the two `scripts/` entries are the static wiring gates. Exit code
@@ -98,6 +99,28 @@ Other commands that matter:
 credentials and are deliberately **not** in `npm test` so CI stays offline and
 deterministic.
 
+## SMS / OTP provider (read before touching sign-in)
+
+Sign-in is phone OTP, so this path is launch-critical. It goes through
+`providers/sms.mjs`, never a vendor adapter directly.
+
+| Env | Meaning |
+|---|---|
+| `BULKSMS_API_TOKEN` | BulkSMS Nigeria token (`BULKSMS_API_KEY` also read). Required for the default provider. |
+| `BULKSMS_SANDBOX=1` | Use `/api/sandbox/v2`: no real SMS, zero cost, `sandbox_mode:true`. |
+| `BULKSMS_SENDER_ID` | Sender id, capped at the documented 11 characters (default `Promota`). |
+| `BULKSMS_BASE_URL` | Override for a proxy/stub; wins over the sandbox flag. |
+| `BULKSMS_OTP_GATEWAY` | Defaults to `direct-refund`. Do NOT point it at the corporate/OTP route: that route silently *skips* recipients whose network is not approved, and a skipped login code is worse than a cheaper one. |
+| `OTP_SECRET` | Key for the OTP challenge (falls back to `SESSION_SECRET`). |
+| `SMS_PROVIDER` | `bulksms` (default when a token exists) or `termii` (explicit rollback). |
+
+BulkSMS has **no verify endpoint**. `sendOtp` returns `pinId`, a self-contained
+HMAC-SHA256 challenge over the encoded payload (nonce + expiry), the recipient
+and the pin, keyed by `OTP_SECRET`/`SESSION_SECRET`; `verifyOtp` checks it
+locally. No schema change is involved. Failed-attempt counting (max 5) is
+in-process — exact for the single-process deploy, cleared by a restart, and a
+table is the fix if Promota is ever run multi-instance.
+
 ## File layout
 
 ```
@@ -107,7 +130,10 @@ api/               routes.mjs (route table), supabase.mjs (PostgREST client),
                    worker.mjs (outbox + auto-approve sweeper), readyz.mjs,
                    session.mjs, admin.mjs, promoter.mjs, business.mjs,
                    social.mjs, mining.mjs, checkin.mjs
-providers/         termii.mjs (SMS/OTP), flutterwave.mjs (bank transfers),
+providers/         sms.mjs (provider switch), bulksms.mjs (BulkSMS Nigeria —
+                   SMS + balance + local signed-challenge OTP), termii.mjs
+                   (carrier lookup, env-selectable SMS fallback),
+                   flutterwave.mjs (bank transfers),
                    data.mjs + dataManager.mjs (data-bundle failover matrix),
                    twenty5.mjs, vtung.mjs, payoutCrypto.mjs
 db/migrations/     forward-only 0001..0020 — the place business rules live
